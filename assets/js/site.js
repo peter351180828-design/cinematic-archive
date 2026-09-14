@@ -28,14 +28,16 @@
     }, delay);
   }
 
-  // Tiny loader clock.
+  // Tiny loader clock. Stop the interval once the loader has gone away.
   const loaderTime = $('[data-loader-time]');
   if (loaderTime) {
     const tick = () => {
       const d = new Date();
       loaderTime.textContent = d.toLocaleTimeString('zh-CN', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
     };
-    tick(); setInterval(tick, 1000);
+    tick();
+    const clockTimer = setInterval(tick, 1000);
+    setTimeout(() => clearInterval(clockTimer), 2600);
   }
 
   // Mobile menu.
@@ -50,22 +52,49 @@
     menu?.classList.remove('is-open'); document.documentElement.style.overflow = '';
   }));
 
-  // Custom cursor.
+  // Custom cursor. The older version kept one requestAnimationFrame loop alive
+  // forever. This version sleeps when the ring reaches the pointer and wakes
+  // only on actual pointer movement.
   const dot = $('.cursor-dot'), ring = $('.cursor-ring');
   if (dot && ring && matchMedia('(pointer:fine)').matches) {
     document.body.classList.add('custom-cursor-ready');
-    let rx = innerWidth / 2, ry = innerHeight / 2, tx = rx, ty = ry;
+    let rx = innerWidth / 2, ry = innerHeight / 2, tx = rx, ty = ry, cursorRaf = null;
+
+    const cursorLoop = () => {
+      cursorRaf = null;
+      rx += (tx-rx)*.18;
+      ry += (ty-ry)*.18;
+      ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+      if (Math.abs(tx-rx) > .18 || Math.abs(ty-ry) > .18) {
+        cursorRaf = requestAnimationFrame(cursorLoop);
+      }
+    };
+    const wakeCursor = () => {
+      if (!cursorRaf && !document.hidden) cursorRaf = requestAnimationFrame(cursorLoop);
+    };
+
     addEventListener('pointermove', e => {
       tx = e.clientX; ty = e.clientY;
       dot.style.transform = `translate(${tx}px,${ty}px) translate(-50%,-50%)`;
-    });
-    const loop = () => {
-      rx += (tx-rx)*.14; ry += (ty-ry)*.14;
-      ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
-      requestAnimationFrame(loop);
-    }; loop();
+      wakeCursor();
+    }, { passive:true });
+
     document.addEventListener('pointerover', e => {
       ring.classList.toggle('is-active', Boolean(e.target.closest('a,button,.project-visual,.archive-card,.home-project-card,.home-list-row,.admin-photo-card')));
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      document.documentElement.classList.toggle('is-page-hidden', document.hidden);
+      if (document.hidden && cursorRaf) {
+        cancelAnimationFrame(cursorRaf);
+        cursorRaf = null;
+      } else {
+        wakeCursor();
+      }
+    });
+  } else {
+    document.addEventListener('visibilitychange', () => {
+      document.documentElement.classList.toggle('is-page-hidden', document.hidden);
     });
   }
 
@@ -81,14 +110,21 @@
     setTimeout(() => { location.href = a.href; }, 430);
   });
 
-  // Reveal items, including dynamically inserted ones.
+  // Reveal items, including dynamically inserted ones. One shared observer is
+  // cheaper than constructing another observer every time a grid is rendered.
+  const revealObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver(entries => entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          revealObserver.unobserve(entry.target);
+        }
+      }), { threshold:.06, rootMargin:'0px 0px -4%' })
+    : null;
+
   function activateReveals(root = document) {
     const els = $$('.reveal:not(.is-visible)', root);
-    if (!('IntersectionObserver' in window)) return els.forEach(el => el.classList.add('is-visible'));
-    const io = new IntersectionObserver(entries => entries.forEach(entry => {
-      if (entry.isIntersecting) { entry.target.classList.add('is-visible'); io.unobserve(entry.target); }
-    }), { threshold:.06, rootMargin:'0px 0px -4%' });
-    els.forEach(el => io.observe(el));
+    if (!revealObserver) return els.forEach(el => el.classList.add('is-visible'));
+    els.forEach(el => revealObserver.observe(el));
   }
   window.CinematicUI = { activateReveals };
   activateReveals();
@@ -118,17 +154,23 @@
   });
   cinemaHero?.addEventListener('pointerleave', () => { if (cinemaHeroBg) cinemaHeroBg.style.translate = ''; });
 
-  // Timeline progress.
+  // Timeline progress, throttled to one layout read per animation frame.
   const timeline = $('.timeline');
   if (timeline) {
+    let timelineRaf = null;
     const update = () => {
+      timelineRaf = null;
       const rect = timeline.getBoundingClientRect();
       const vh = innerHeight;
       const progress = Math.max(0, Math.min(1, (vh * .72 - rect.top) / Math.max(1, rect.height - vh * .25)));
       timeline.style.setProperty('--timeline-progress', progress.toFixed(4));
     };
-    addEventListener('scroll', update, { passive:true });
-    addEventListener('resize', update); update();
+    const scheduleTimeline = () => {
+      if (!timelineRaf) timelineRaf = requestAnimationFrame(update);
+    };
+    addEventListener('scroll', scheduleTimeline, { passive:true });
+    addEventListener('resize', scheduleTimeline, { passive:true });
+    update();
   }
 
   // V7 — transparent at the top, glass navigation after the page starts moving.

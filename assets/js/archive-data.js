@@ -84,8 +84,8 @@
         <a class="home-project-link" data-transition href="project.html?collection=${encodeURIComponent(project.name)}">
           <span class="home-project-num mono">${String(i+1).padStart(2,'0')} / ${esc(project.year || '—')}</span>
           <div class="home-project-frame" data-fit="${chosen.fit}">
-            <img class="home-project-backdrop" loading="lazy" src="${safeUrl}" alt="" aria-hidden="true">
-            <img class="home-project-image" loading="${!clone && i < 2 ? 'eager':'lazy'}" src="${safeUrl}" alt="${esc(project.name)}">
+            <img class="home-project-backdrop" loading="lazy" decoding="async" src="${safeUrl}" alt="" aria-hidden="true">
+            <img class="home-project-image" loading="${!clone && i < 2 ? 'eager':'lazy'}" decoding="async" src="${safeUrl}" alt="${esc(project.name)}">
           </div>
           <h3 class="home-project-title">${firstCharTitle(project.name)}</h3>
           <div class="home-project-meta"><span>${project.count} 张照片</span><span>${esc(project.year || '日期未知')}</span></div>
@@ -102,13 +102,12 @@
     let last = performance.now();
     let carry = 0;
     let pointerHasMoved = false;
-    const speed = 38; // px / second — slow, but clearly perceptible.
+    let inViewport = false;
+    const speed = 34; // px / second — slow film movement, but clearly visible.
 
     const originals = () => [...slider.querySelectorAll('.home-project-card:not([data-loop-clone="true"])')];
     const firstClone = () => slider.querySelector('[data-loop-start="true"]');
 
-    // Exact distance occupied by the original film strip. The cloned strip begins
-    // at the same visual position one cycle later, so wrapping is seamless.
     const loopDistance = () => {
       const first = originals()[0];
       const clone = firstClone();
@@ -123,97 +122,117 @@
       else if (slider.scrollLeft < 0) slider.scrollLeft += distance;
     };
 
+    const eligible = () =>
+      inViewport &&
+      !hoverPaused &&
+      !manualPaused &&
+      !document.hidden &&
+      !slider.hidden &&
+      innerWidth > 820 &&
+      slider.scrollWidth > slider.clientWidth + 4;
+
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      carry = 0;
+    };
+
     const tick = now => {
+      raf = null;
+      if (!eligible()) return;
       const dt = Math.min(64, Math.max(0, now - last));
       last = now;
-      const canMove = !hoverPaused && !manualPaused && !document.hidden && !slider.hidden && innerWidth > 820;
-      if (canMove && slider.scrollWidth > slider.clientWidth + 4) {
-        // Some browsers visually quantize element scrolling to whole pixels.
-        // Accumulate the fractional distance ourselves and only commit integer
-        // pixels, so the strip always advances instead of appearing frozen.
-        carry += speed * dt / 1000;
-        const step = Math.floor(carry);
-        if (step >= 1) {
-          slider.scrollLeft += step;
-          carry -= step;
-          normalize();
-        }
+      carry += speed * dt / 1000;
+      const step = Math.floor(carry);
+      if (step >= 1) {
+        slider.scrollLeft += step;
+        carry -= step;
+        normalize();
       }
       raf = requestAnimationFrame(tick);
     };
+
+    const startLoop = () => {
+      if (raf || !eligible()) return;
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    };
+
+    const syncLoop = () => eligible() ? startLoop() : stop();
 
     const pauseForManualInput = (delay = 1400) => {
       clearTimeout(resumeTimer);
       manualPaused = true;
+      stop();
       resumeTimer = setTimeout(() => {
         manualPaused = false;
-        carry = 0;
         last = performance.now();
+        startLoop();
       }, delay);
     };
 
-    // Important: do NOT pause merely because the page was loaded with the mouse
-    // already resting over a card. We only arm hover-pause after a real pointer
-    // movement, so autoplay is always visible on entry.
+    // Autoplay only consumes frames while the film strip is actually visible.
+    const io = 'IntersectionObserver' in window
+      ? new IntersectionObserver(entries => {
+          inViewport = entries.some(entry => entry.isIntersecting);
+          syncLoop();
+        }, { rootMargin:'120px 0px', threshold:.01 })
+      : null;
+    if (io) io.observe(slider);
+    else inViewport = true;
+
+    // Hover pause is armed only after real pointer movement. This keeps autoplay
+    // visible on page entry even if the cursor happens to already sit on a card.
     slider.addEventListener('pointermove', e => {
       pointerHasMoved = true;
-      hoverPaused = !!e.target.closest('.home-project-card');
+      const paused = Boolean(e.target.closest('.home-project-card'));
+      if (paused !== hoverPaused) {
+        hoverPaused = paused;
+        syncLoop();
+      }
     }, { passive:true });
     slider.addEventListener('pointerleave', () => {
       hoverPaused = false;
-      last = performance.now();
-    });
-    slider.addEventListener('pointerover', e => {
-      if (!pointerHasMoved) return;
-      if (e.target.closest('.home-project-card')) hoverPaused = true;
-    });
-    slider.addEventListener('pointerout', e => {
-      if (!pointerHasMoved) return;
-      const fromCard = e.target.closest?.('.home-project-card');
-      const toCard = e.relatedTarget?.closest?.('.home-project-card');
-      if (fromCard && !toCard) {
-        hoverPaused = false;
-        last = performance.now();
-      }
+      startLoop();
     });
 
-    // Keyboard focus also pauses so links remain usable.
     slider.addEventListener('focusin', e => {
-      if (e.target.closest('.home-project-card')) hoverPaused = true;
+      if (e.target.closest('.home-project-card')) {
+        hoverPaused = true;
+        stop();
+      }
     });
     slider.addEventListener('focusout', e => {
       if (!slider.contains(e.relatedTarget)) {
         hoverPaused = false;
-        last = performance.now();
+        startLoop();
       }
     });
 
-    // Manual browsing temporarily wins; autoplay resumes automatically.
-    slider.addEventListener('wheel', () => pauseForManualInput(1800), { passive:true });
+    slider.addEventListener('wheel', () => pauseForManualInput(1700), { passive:true });
     slider.addEventListener('pointerdown', () => {
       clearTimeout(resumeTimer);
       manualPaused = true;
+      stop();
     });
     ['pointerup','pointercancel','lostpointercapture'].forEach(type =>
-      slider.addEventListener(type, () => pauseForManualInput(1200))
+      slider.addEventListener(type, () => pauseForManualInput(1100))
     );
-    document.addEventListener('visibilitychange', () => {
-      carry = 0;
-      last = performance.now();
-    });
 
-    // Start even when the OS requests reduced motion because this moving film
-    // strip is an explicitly requested core browsing feature. The dedicated
-    // motion switch in the site UI can still be used to disable effects.
+    slider.addEventListener('film-visibility-change', syncLoop);
+    document.addEventListener('visibilitychange', syncLoop);
+    addEventListener('resize', syncLoop, { passive:true });
+
+    // Give layout/images a moment to establish the loop distance.
     setTimeout(() => {
-      carry = 0;
-      last = performance.now();
-      raf = requestAnimationFrame(tick);
+      inViewport = io ? inViewport : true;
+      startLoop();
     }, 650);
 
     addEventListener('pagehide', () => {
       clearTimeout(resumeTimer);
-      if (raf) cancelAnimationFrame(raf);
+      stop();
+      io?.disconnect();
     }, { once:true });
   }
 
@@ -222,7 +241,7 @@
     const safe = esc(photo.url);
     const slide = document.createElement('div');
     slide.className = 'cinema-hero-slide';
-    slide.innerHTML = `<img class="cinema-hero-backdrop" src="${safe}" alt="" aria-hidden="true"><img class="cinema-hero-image" src="${safe}" alt="${esc(photo.project || 'Hero image')}">`;
+    slide.innerHTML = `<img class="cinema-hero-backdrop" decoding="async" src="${safe}" alt="" aria-hidden="true"><img class="cinema-hero-image" decoding="async" src="${safe}" alt="${esc(photo.project || 'Hero image')}">`;
     const main = slide.querySelector('.cinema-hero-image');
     const decide = () => { slide.dataset.fit = heroFit(photo, main); };
     main?.addEventListener('load', decide, { once:true });
@@ -345,29 +364,64 @@
       list.hidden = isSlider;
       $('.home-slider-help')?.toggleAttribute('hidden', !isSlider);
       buttons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.homeView === mode));
+      slider.dispatchEvent(new CustomEvent('film-visibility-change'));
     };
     buttons.forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.homeView)));
     // Every visit starts in the cinematic horizontal film-strip view. LIST remains an optional temporary view.
     setView('slider');
 
-    // Horizontal wheel + drag interaction, mirroring the first cinematic prototype.
+    // Horizontal wheel + drag. Pointer capture starts only AFTER a real drag.
+    // This is important: capturing on pointerdown retargeted normal clicks to the
+    // slider in some browsers, which made project cards look unclickable.
     slider.addEventListener('wheel', e => {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       e.preventDefault();
       slider.scrollLeft += e.deltaY * .9;
     }, {passive:false});
-    let dragging = false, dragMoved = false, startX = 0, startScroll = 0;
+
+    let pointerDown = false, dragging = false, dragMoved = false;
+    let dragPointerId = null, startX = 0, startScroll = 0;
+
     slider.addEventListener('pointerdown', e => {
-      dragging = true; dragMoved = false; startX = e.clientX; startScroll = slider.scrollLeft;
-      slider.setPointerCapture?.(e.pointerId);
+      if (e.button != null && e.button !== 0) return;
+      pointerDown = true;
+      dragging = false;
+      dragMoved = false;
+      dragPointerId = e.pointerId;
+      startX = e.clientX;
+      startScroll = slider.scrollLeft;
     });
+
     slider.addEventListener('pointermove', e => {
+      if (!pointerDown || e.pointerId !== dragPointerId) return;
+      const dx = e.clientX - startX;
+      if (!dragging && Math.abs(dx) > 8) {
+        dragging = true;
+        dragMoved = true;
+        slider.setPointerCapture?.(e.pointerId);
+      }
       if (!dragging) return;
-      if (Math.abs(e.clientX - startX) > 6) dragMoved = true;
-      slider.scrollLeft = startScroll - (e.clientX - startX);
-    });
-    slider.addEventListener('click', e => { if (dragMoved) { e.preventDefault(); e.stopPropagation(); dragMoved = false; } }, true);
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, () => dragging = false));
+      e.preventDefault();
+      slider.scrollLeft = startScroll - dx;
+    }, {passive:false});
+
+    const finishDrag = e => {
+      if (dragging && slider.hasPointerCapture?.(dragPointerId)) {
+        try { slider.releasePointerCapture(dragPointerId); } catch (_) {}
+      }
+      pointerDown = false;
+      dragging = false;
+      dragPointerId = null;
+      if (dragMoved) setTimeout(() => { dragMoved = false; }, 280);
+    };
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, finishDrag));
+
+    slider.addEventListener('click', e => {
+      if (!dragMoved) return; // ordinary click: let the project <a> navigate.
+      e.preventDefault();
+      e.stopPropagation();
+      dragMoved = false;
+    }, true);
 
     if (preview) {
       const img = preview.querySelector('img');
@@ -394,7 +448,7 @@
     const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
     const shape = w && h ? (h > w * 1.12 ? 'is-portrait' : w > h * 1.28 ? 'is-wide' : 'is-standard') : 'is-standard';
     return `<article class="project-flow-item ${shape} reveal">
-      <div class="project-flow-media"><a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
+      <div class="project-flow-media"><a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" decoding="async" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
       <div class="project-flow-caption">
         <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
         <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
@@ -461,7 +515,7 @@
   function archiveCard(photo) {
     return `<article class="archive-card reveal" data-project="${esc(photo.project || '未分类')}">
       <a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}">
-        <img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
+        <img loading="lazy" decoding="async" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
         <div class="archive-card-meta"><span>${esc(photo.project || '未分类')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span></div>
       </a>
     </article>`;

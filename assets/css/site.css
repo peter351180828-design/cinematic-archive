@@ -1407,3 +1407,65 @@ body[data-page="admin"] .admin-check{
   .photo-view-edge-nav{width:40px;height:62px}
   .photo-view-edge-nav span{font-size:36px}
 }
+
+
+/* ======================================================================
+   V18 — viewer readability + performance budget
+   ====================================================================== */
+
+/* The EXIF panel is information, not micro-caption copy. */
+.photo-view-exif{
+  gap:24px 20px;
+}
+.photo-view-exif div{
+  padding-top:10px;
+}
+.photo-view-exif small{
+  font-size:10px;
+  line-height:1.25;
+  letter-spacing:.075em;
+  color:#a39b8f;
+}
+.photo-view-exif b{
+  margin-top:6px;
+  font-size:17px;
+  line-height:1.3;
+  font-weight:650;
+  letter-spacing:-.018em;
+}
+@media(min-width:1280px){
+  .photo-view-exif b{font-size:18px}
+  .photo-view-exif small{font-size:10.5px}
+}
+
+/* Preserve the grain, but update it far less aggressively.  The previous
+   0.18 s fixed full-screen animation was one of the avoidable continuous
+   paint/compositing loads on long photo sessions. */
+.film-grain{
+  animation-duration:.72s;
+  will-change:transform;
+}
+html.is-page-hidden .film-grain{animation-play-state:paused}
+
+/* Large archives can contain hundreds of cards. Let the browser skip layout/
+   paint work for cards far outside the viewport while keeping their space. */
+.archive-card,
+.project-flow-item,
+.admin-photo-card{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 420px;
+}
+
+/* Do not accidentally turn the film strip into a text-selection drag surface. */
+.home-project-slider{
+  user-select:none;
+  -webkit-user-select:none;
+}
+.home-project-link{
+  -webkit-user-drag:none;
+  touch-action:pan-y;
+}
+.home-project-link img{
+  -webkit-user-drag:none;
+  user-select:none;
+}
