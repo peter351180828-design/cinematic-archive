@@ -394,7 +394,7 @@
     const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
     const shape = w && h ? (h > w * 1.12 ? 'is-portrait' : w > h * 1.28 ? 'is-wide' : 'is-standard') : 'is-standard';
     return `<article class="project-flow-item ${shape} reveal">
-      <div class="project-flow-media"><img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></div>
+      <div class="project-flow-media"><a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
       <div class="project-flow-caption">
         <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
         <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
@@ -460,7 +460,7 @@
 
   function archiveCard(photo) {
     return `<article class="archive-card reveal" data-project="${esc(photo.project || '未分类')}">
-      <a data-transition href="project.html?collection=${encodeURIComponent(photo.project || '未分类')}">
+      <a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}">
         <img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
         <div class="archive-card-meta"><span>${esc(photo.project || '未分类')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span></div>
       </a>
@@ -493,6 +493,57 @@
       render();
     }));
     filter.addEventListener('change',render); render();
+  }
+
+  async function initPhotoView() {
+    if (page !== 'photo') return;
+    const root = $('#photo-view-root');
+    if (!A?.configured) { root.innerHTML = setupNotice(); return; }
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const collection = params.get('collection');
+    if (!id) { root.innerHTML = '<div class="photo-view-error">没有指定照片。</div>'; return; }
+
+    const [allPhotos, settings] = await Promise.all([
+      photosSafe(),
+      A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})
+    ]);
+    if (!allPhotos) { root.innerHTML = '<div class="photo-view-error">照片读取失败，请检查网络。</div>'; return; }
+    const publicPhotos = A?.filterVisiblePhotos ? A.filterVisiblePhotos(allPhotos, settings) : allPhotos;
+    let scoped = collection ? publicPhotos.filter(p => (p.project || '未分类') === collection) : publicPhotos;
+    if (!scoped.some(p => String(p.id) === String(id))) scoped = publicPhotos;
+    scoped = [...scoped].sort((a,b) => (A.photoTime?.(a) || 0) - (A.photoTime?.(b) || 0));
+    const index = scoped.findIndex(p => String(p.id) === String(id));
+    const photo = index >= 0 ? scoped[index] : null;
+    if (!photo) { root.innerHTML = '<div class="photo-view-error">这张照片不存在，或所属摄影集已隐藏。</div>'; return; }
+
+    const img = $('#photo-view-image');
+    img.src = photo.url;
+    img.alt = photo.project || '摄影作品';
+    $('#photo-view-index').textContent = `${String(index + 1).padStart(2,'0')} / ${String(scoped.length).padStart(2,'0')}`;
+    $('#photo-view-date').textContent = dateLabel(photo.exif?.dateTaken || photo.uploadedAt);
+    $('#photo-view-collection').textContent = photo.project || '未分类';
+    const pairs = exifPairs(photo);
+    $('#photo-view-exif').innerHTML = pairs.length
+      ? pairs.map(([label,value]) => `<div><small>${esc(label)}</small><b>${esc(value)}</b></div>`).join('')
+      : '<div><small>EXIF</small><b>无可读信息</b></div>';
+
+    const prev = scoped[index - 1] || null;
+    const next = scoped[index + 1] || null;
+    const collectionQuery = encodeURIComponent(photo.project || '未分类');
+    const go = target => {
+      if (!target) return;
+      location.href = `photo.html?id=${encodeURIComponent(target.id)}&collection=${collectionQuery}`;
+    };
+    const prevBtn = $('#photo-view-prev'), nextBtn = $('#photo-view-next');
+    prevBtn.disabled = !prev; nextBtn.disabled = !next;
+    prevBtn.addEventListener('click', () => go(prev));
+    nextBtn.addEventListener('click', () => go(next));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' && prev) go(prev);
+      if (event.key === 'ArrowRight' && next) go(next);
+      if (event.key === 'Escape') location.href = `project.html?collection=${collectionQuery}`;
+    });
   }
 
   function renderBars(el,items){
@@ -529,5 +580,6 @@
   initHome();
   initProject();
   initArchive();
+  initPhotoView();
   initStats();
 })();

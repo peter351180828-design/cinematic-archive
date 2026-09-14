@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>照片 — Photo Archive</title><link rel="stylesheet" href="assets/css/site.css?v=16"></head>
+<body data-page="photo">
+  <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
+  <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span data-global-count>读取中</span><a href="admin.html" data-transition>MANAGE</a></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
+  <div class="mobile-menu" data-mobile-menu><nav><a href="index.html">WORK</a><a href="archive.html">ARCHIVE</a><a href="stats.html">DATA</a><a href="about.html">ABOUT</a><a href="admin.html">MANAGE</a></nav></div>
+  <main class="photo-view-shell" id="photo-view-root">
+    <section class="photo-view-stage">
+      <div class="photo-view-media"><img id="photo-view-image" alt="摄影作品"></div>
+      <aside class="photo-view-info">
+        <div class="photo-view-topline"><span id="photo-view-index">—</span><span id="photo-view-date">—</span></div>
+        <h1 id="photo-view-collection">PHOTO</h1>
+        <div id="photo-view-exif" class="photo-view-exif"></div>
+        <div class="photo-view-actions">
+          <button type="button" id="photo-view-prev">← PREV</button>
+          <a href="archive.html" data-transition>BACK TO ARCHIVE</a>
+          <button type="button" id="photo-view-next">NEXT →</button>
+        </div>
+        <p class="photo-view-hint">← / → KEYBOARD · FULL IMAGE · EXIF</p>
+      </aside>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=16"></script><script src="assets/js/site.js?v=16"></script><script src="assets/js/archive-data.js?v=16"></script>
+</body></html>
