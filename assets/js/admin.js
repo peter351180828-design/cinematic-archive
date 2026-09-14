@@ -18,13 +18,18 @@
   const selectAllBtn = $('#admin-select-all'), clearBtn = $('#admin-clear-selection'), deleteBtn = $('#admin-delete-selected');
   const identityForm = $('#identity-form'), englishNameInput = $('#english-display-name'), identityStatus = $('#identity-status');
   const visibilityList = $('#collection-visibility-list'), visibilityStatus = $('#collection-visibility-status'), visibilitySummary = $('#collection-visibility-summary');
+  const storageUsed = $('#storage-used'), storageOf = $('#storage-of'), storagePercent = $('#storage-percent');
+  const storageRemaining = $('#storage-remaining'), storageAverage = $('#storage-average'), storageEstimate = $('#storage-estimate');
+  const storageMeter = $('.storage-meter'), storageMeterBar = $('#storage-meter-bar'), storagePhotoSummary = $('#storage-photo-summary');
+  const storageQuotaForm = $('#storage-quota-form'), storageQuotaPreset = $('#storage-quota-preset');
+  const storageCustomField = $('#storage-custom-field'), storageCustomGb = $('#storage-custom-gb'), storageQuotaStatus = $('#storage-quota-status');
 
   let files = [];
   let currentUser = null;
   let knownProjects = [];
   let libraryPhotos = [];
   let visiblePhotos = [];
-  let siteSettings = { hiddenProjects: [] };
+  let siteSettings = { hiddenProjects: [], storageQuotaGB: 1 };
   const selectedIds = new Set();
 
   function setStatus(message, isError=false) {
@@ -96,14 +101,94 @@
     if (!englishNameInput || !A?.loadSiteSettings) return;
     try {
       const settings = await A.loadSiteSettings(true);
-      siteSettings = { ...settings, hiddenProjects:Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : [] };
+      siteSettings = { ...settings, hiddenProjects:Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : [], storageQuotaGB:Number(settings.storageQuotaGB) > 0 ? Number(settings.storageQuotaGB) : 1 };
       englishNameInput.value = settings.englishName || A.config.englishName || '';
       if (identityStatus) identityStatus.textContent = '当前名称已同步';
+      syncStorageQuotaForm();
       renderCollectionVisibility();
+      renderStorageUsage();
     } catch (error) {
       if (identityStatus) identityStatus.textContent = `读取名称失败：${error.message || error}`;
     }
   }
+
+  function formatBytes(bytes) {
+    const n = Number(bytes) || 0;
+    if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 10e9 ? 0 : 2)} GB`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 100e6 ? 0 : 1)} MB`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)} KB`;
+    return `${Math.round(n)} B`;
+  }
+
+  function currentQuotaGB() {
+    const configured = Number(siteSettings?.storageQuotaGB);
+    return Number.isFinite(configured) && configured > 0 ? configured : 1;
+  }
+
+  function syncStorageQuotaForm() {
+    if (!storageQuotaPreset) return;
+    const q = currentQuotaGB();
+    if (Math.abs(q - 1) < .001) storageQuotaPreset.value = '1';
+    else if (Math.abs(q - 100) < .001) storageQuotaPreset.value = '100';
+    else {
+      storageQuotaPreset.value = 'custom';
+      if (storageCustomGb) storageCustomGb.value = String(q);
+    }
+    if (storageCustomField) storageCustomField.hidden = storageQuotaPreset.value !== 'custom';
+  }
+
+  function renderStorageUsage() {
+    if (!storageUsed) return;
+    const managed = libraryPhotos.filter(photo => Number(photo.bytes) > 0);
+    const used = managed.reduce((sum, photo) => sum + (Number(photo.bytes) || 0), 0);
+    const quotaGB = currentQuotaGB();
+    const quotaBytes = quotaGB * 1e9;
+    const remaining = Math.max(0, quotaBytes - used);
+    const avg = managed.length ? used / managed.length : 0;
+    const percent = quotaBytes > 0 ? (used / quotaBytes) * 100 : 0;
+    const est = avg > 0 ? Math.max(0, Math.floor(remaining / avg)) : null;
+
+    storageUsed.textContent = formatBytes(used);
+    storageOf.textContent = `/ ${quotaGB >= 10 ? Number(quotaGB.toFixed(0)) : Number(quotaGB.toFixed(1))} GB`;
+    storagePercent.textContent = `${percent < 10 ? percent.toFixed(1) : Math.round(percent)}%`;
+    storageRemaining.textContent = formatBytes(remaining);
+    storageAverage.textContent = avg ? formatBytes(avg) : '—';
+    storageEstimate.textContent = est == null ? '—' : `~${est.toLocaleString('zh-CN')}`;
+    storagePhotoSummary.textContent = `${managed.length.toLocaleString('zh-CN')} 张已记录大小的网页照片 · 当前照片总数 ${libraryPhotos.length.toLocaleString('zh-CN')} 张`;
+    if (storageMeterBar) storageMeterBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+    if (storageMeter) {
+      storageMeter.classList.toggle('is-warning', percent >= 75 && percent < 90);
+      storageMeter.classList.toggle('is-danger', percent >= 90);
+    }
+  }
+
+  storageQuotaPreset?.addEventListener('change', () => {
+    if (storageCustomField) storageCustomField.hidden = storageQuotaPreset.value !== 'custom';
+  });
+
+  storageQuotaForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentUser || !A?.saveSiteSettings) return;
+    let quotaGB = storageQuotaPreset?.value === 'custom' ? Number(storageCustomGb?.value) : Number(storageQuotaPreset?.value);
+    if (!Number.isFinite(quotaGB) || quotaGB <= 0) {
+      if (storageQuotaStatus) storageQuotaStatus.textContent = '请输入有效的存储额度。';
+      return;
+    }
+    const button = storageQuotaForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    if (storageQuotaStatus) storageQuotaStatus.textContent = '正在保存显示额度…';
+    try {
+      siteSettings = await A.saveSiteSettings({ storageQuotaGB:quotaGB });
+      if (storageQuotaStatus) storageQuotaStatus.textContent = `已保存 · 仪表盘按 ${quotaGB} GB 计算。注意：这不会自动升级 Supabase 套餐。`;
+      syncStorageQuotaForm();
+      renderStorageUsage();
+    } catch (error) {
+      console.error(error);
+      if (storageQuotaStatus) storageQuotaStatus.textContent = `保存失败：${error.message || error}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   function hiddenProjectsSet() {
     return new Set((Array.isArray(siteSettings.hiddenProjects) ? siteSettings.hiddenProjects : []).map(v => String(v || '').trim()).filter(Boolean));
@@ -323,6 +408,7 @@
       syncLibraryChooser(preferredProject);
       $('#admin-photo-count').textContent = `${libraryPhotos.length} 张 · ${knownProjects.length} 个摄影集`;
       renderCollectionVisibility();
+      renderStorageUsage();
       renderLibrary();
     } catch (error) { photoList.innerHTML = `<p class="admin-message">读取失败：${escapeHtml(error.message)}</p>`; }
   }

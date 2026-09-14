@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=9"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=10"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
   <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span id="auth-status">PRIVATE</span><button id="logout-button" type="button" hidden>LOG OUT</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
@@ -23,6 +23,37 @@
         </form>
       </section>
 
+
+      <section class="admin-section-block admin-storage-block">
+        <div class="admin-section-title"><div><span class="eyebrow">STORAGE</span><h2>存储空间</h2></div><p>根据本站照片记录中的网页 JPEG 大小实时估算。Supabase 官方 Usage 页面仍是计费与总用量的最终依据。</p></div>
+        <div class="storage-dashboard">
+          <div class="storage-primary">
+            <span class="storage-kicker">MANAGED PHOTO STORAGE</span>
+            <strong id="storage-used">—</strong>
+            <span id="storage-of">/ 1 GB</span>
+          </div>
+          <div class="storage-metrics">
+            <div><span>USED</span><b id="storage-percent">—</b></div>
+            <div><span>REMAINING</span><b id="storage-remaining">—</b></div>
+            <div><span>AVERAGE / PHOTO</span><b id="storage-average">—</b></div>
+            <div><span>EST. MORE PHOTOS</span><b id="storage-estimate">—</b></div>
+          </div>
+        </div>
+        <div class="storage-meter" aria-label="Storage usage"><i id="storage-meter-bar"></i></div>
+        <div class="storage-foot"><span id="storage-photo-summary">正在计算…</span><span>≈ 估算值 · 不含其他项目或孤立 Storage 文件</span></div>
+        <form id="storage-quota-form" class="storage-quota-form">
+          <label>仪表盘额度
+            <select id="storage-quota-preset">
+              <option value="1">FREE · 1 GB</option>
+              <option value="100">PRO · 100 GB</option>
+              <option value="custom">CUSTOM</option>
+            </select>
+          </label>
+          <label id="storage-custom-field" hidden>自定义额度（GB）<input id="storage-custom-gb" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="例如 250"></label>
+          <button class="admin-button" type="submit">SAVE DISPLAY QUOTA</button>
+          <p id="storage-quota-status" class="admin-message">这里只改变本站进度条显示，不会购买或修改 Supabase 套餐。</p>
+        </form>
+      </section>
 
       <section class="admin-section-block admin-visibility-block">
         <div class="admin-section-title"><div><span class="eyebrow">COLLECTION VISIBILITY</span><h2>摄影集展示</h2></div><p>控制哪些摄影集出现在公开网站。设为 HIDDEN 只会从首页、档案、详情入口与数据页隐藏，不会删除照片或 EXIF。</p></div>
@@ -61,5 +92,5 @@
       </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=9"></script><script src="assets/js/site.js?v=9"></script><script src="assets/js/admin.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=10"></script><script src="assets/js/site.js?v=10"></script><script src="assets/js/admin.js?v=10"></script>
 </body></html>
