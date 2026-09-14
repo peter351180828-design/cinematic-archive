@@ -25,12 +25,46 @@
     return `<span class="accent-char">${esc(str.slice(0,1))}</span>${esc(str.slice(1))}`;
   }
 
+  function chooseHeroPhoto(photos, projectName) {
+    const candidates = photos.filter(p => (p.project || '未分类') === projectName && p.url);
+    if (!candidates.length) return null;
+    const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+    const scored = candidates.map((photo, index) => {
+      const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
+      const ratio = w && h ? w / h : null;
+      const ratioScore = ratio ? Math.abs(Math.log(ratio / viewportRatio)) : 3;
+      const featuredBonus = photo.isFeatured ? -.3 : 0;
+      return { photo, score:ratioScore + featuredBonus + index * .00001 };
+    }).sort((a,b)=>a.score-b.score);
+    return scored[0].photo;
+  }
+
+  function mountAdaptiveHero(container, photo) {
+    if (!container || !photo?.url) return;
+    const safe = esc(photo.url);
+    container.innerHTML = `<img class="cinema-hero-backdrop" src="${safe}" alt="" aria-hidden="true"><img class="cinema-hero-image" src="${safe}" alt="${esc(photo.project || 'Hero image')}">`;
+    const main = container.querySelector('.cinema-hero-image');
+    const decide = () => {
+      const w = Number(photo.exif?.width || main?.naturalWidth || 0);
+      const h = Number(photo.exif?.height || main?.naturalHeight || 0);
+      if (!w || !h) return container.dataset.fit = 'contain';
+      const imageRatio = w / h;
+      const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+      const relative = imageRatio / viewportRatio;
+      // Near the viewport ratio: permit only modest cropping. Extreme portrait/wide images stay fully visible.
+      container.dataset.fit = relative > .78 && relative < 1.28 ? 'cover' : 'contain';
+    };
+    main?.addEventListener('load', decide, { once:true });
+    decide();
+    addEventListener('resize', decide, { passive:true });
+  }
+
   async function updateCount() {
     const targets = $$('[data-global-count]');
     if (!targets.length) return;
-    if (!A?.configured) return targets.forEach(el => el.textContent = '未连接');
+    if (!A?.configured) return targets.forEach(el => el.textContent = 'NOT CONNECTED');
     const photos = await photosSafe();
-    targets.forEach(el => el.textContent = photos ? `${photos.length} 张` : '读取失败');
+    targets.forEach(el => el.textContent = photos ? `${photos.length} PHOTOS` : 'LOAD ERROR');
   }
 
   async function initHome() {
@@ -43,7 +77,8 @@
     const preview = $('#home-list-preview');
     if (!slider || !list) return;
 
-    if (heroTitle) heroTitle.innerHTML = firstCharTitle(A?.config?.siteName || '咸鱼桑');
+    const siteSettings = A?.loadSiteSettings ? await A.loadSiteSettings() : {};
+    if (heroTitle) heroTitle.innerHTML = firstCharTitle(siteSettings.englishName || A?.config?.englishName || 'PHOTO ARCHIVE');
 
     if (!A?.configured) {
       slider.innerHTML = setupNotice();
@@ -61,7 +96,8 @@
 
     const projects = A.groupProjects(photos);
     if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
-    if (heroBg && projects[0]?.cover?.url) heroBg.style.backgroundImage = `linear-gradient(90deg,rgba(4,8,8,.34),rgba(4,8,8,.1)),url("${projects[0].cover.url.replace(/"/g,'%22')}")`;
+    const heroPhoto = projects[0] ? (chooseHeroPhoto(photos, projects[0].name) || projects[0].cover) : null;
+    if (heroBg && heroPhoto?.url) mountAdaptiveHero(heroBg, heroPhoto);
 
     slider.innerHTML = projects.map((project, i) => `
       <article class="home-project-card reveal">
@@ -178,24 +214,16 @@
   }
 
   function archiveCard(photo) {
-    const exif = [photo.exif?.camera, photo.formatted?.focalLength, photo.formatted?.aperture, photo.formatted?.shutter].filter(Boolean);
     return `<article class="archive-card reveal" data-project="${esc(photo.project || '未分类')}">
       <a data-transition href="project.html?collection=${encodeURIComponent(photo.project || '未分类')}">
         <img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
         <div class="archive-card-meta"><span>${esc(photo.project || '未分类')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span></div>
-        <div class="archive-card-exif">${exif.map(v=>`<span>${esc(v)}</span>`).join('')}</div>
       </a>
     </article>`;
   }
-  function archiveIndexRow(photo,index) {
-    const exif = [photo.exif?.camera, photo.formatted?.focalLength, photo.formatted?.aperture].filter(Boolean).join(' · ');
-    return `<a class="archive-index-row" data-transition href="project.html?collection=${encodeURIComponent(photo.project || '未分类')}" data-preview="${esc(photo.url)}">
-      <span>${String(index+1).padStart(3,'0')}</span><span>${esc(photo.project || '未分类')}</span><span>${esc(exif || '无 EXIF')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span>
-    </a>`;
-  }
   async function initArchive() {
     if (page !== 'archive') return;
-    const grid = $('#archive-grid'), indexList = $('#archive-index'), count = $('#archive-count'), filter = $('#archive-filter');
+    const grid = $('#archive-grid'), count = $('#archive-count'), filter = $('#archive-filter');
     if (!A?.configured) { grid.innerHTML = setupNotice(); return; }
     const photos = await photosSafe();
     if (!photos) { grid.innerHTML = '<div class="archive-empty">读取失败，请检查网络。</div>'; return; }
@@ -206,32 +234,9 @@
       const visible = filter.value ? photos.filter(p=>(p.project||'未分类')===filter.value) : photos;
       count.textContent = `${visible.length} 张照片`;
       grid.innerHTML = visible.map(archiveCard).join('');
-      indexList.innerHTML = visible.map(archiveIndexRow).join('');
       UI()?.activateReveals(grid);
-      bindPreview();
     };
     filter.addEventListener('change',render); render();
-
-    const gridBtn = $('#view-grid'), indexBtn = $('#view-index');
-    const setView = mode => {
-      const isGrid = mode==='grid';
-      grid.hidden = !isGrid; indexList.hidden = isGrid;
-      gridBtn.classList.toggle('is-active',isGrid); indexBtn.classList.toggle('is-active',!isGrid);
-      localStorage.setItem('archive-view',mode);
-    };
-    gridBtn.addEventListener('click',()=>setView('grid'));
-    indexBtn.addEventListener('click',()=>setView('index'));
-    setView(localStorage.getItem('archive-view')==='index'?'index':'grid');
-
-    function bindPreview(){
-      const preview = $('#archive-preview'), img = preview?.querySelector('img');
-      if (!preview || !img) return;
-      $$('.archive-index-row',indexList).forEach(row=>{
-        row.addEventListener('pointerenter',()=>{ img.src=row.dataset.preview; preview.classList.add('is-visible'); });
-        row.addEventListener('pointermove',e=>{ preview.style.left=`${Math.min(innerWidth-240,Math.max(240,e.clientX))}px`;preview.style.top=`${Math.min(innerHeight-220,Math.max(220,e.clientY))}px`; });
-        row.addEventListener('pointerleave',()=>preview.classList.remove('is-visible'));
-      });
-    }
   }
 
   function renderBars(el,items){

@@ -16,6 +16,7 @@
   const selectedCount = $('#admin-selected-count');
   const visibleCount = $('#admin-visible-count');
   const selectAllBtn = $('#admin-select-all'), clearBtn = $('#admin-clear-selection'), deleteBtn = $('#admin-delete-selected');
+  const identityForm = $('#identity-form'), englishNameInput = $('#english-display-name'), identityStatus = $('#identity-status');
 
   let files = [];
   let currentUser = null;
@@ -89,6 +90,33 @@
     return canonicalExistingProject(typed)?.name || typed;
   }
 
+  async function loadIdentitySettings() {
+    if (!englishNameInput || !A?.loadSiteSettings) return;
+    try {
+      const settings = await A.loadSiteSettings(true);
+      englishNameInput.value = settings.englishName || A.config.englishName || '';
+      if (identityStatus) identityStatus.textContent = '当前名称已同步';
+    } catch (error) {
+      if (identityStatus) identityStatus.textContent = `读取名称失败：${error.message || error}`;
+    }
+  }
+
+  identityForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentUser) return;
+    const value = String(englishNameInput?.value || '').trim().replace(/\s+/g,' ');
+    if (!value) { identityStatus.textContent = '请输入英文用户名。'; return; }
+    const button = identityForm.querySelector('button[type="submit"]');
+    button.disabled = true; identityStatus.textContent = '正在保存…';
+    try {
+      const saved = await A.saveSiteSettings({ englishName:value });
+      identityStatus.textContent = `已保存：${saved.englishName}`;
+      document.querySelectorAll('[data-english-name]').forEach(el => el.textContent = saved.englishName);
+    } catch (error) {
+      console.error(error); identityStatus.textContent = `保存失败：${error.message || error}`;
+    } finally { button.disabled = false; }
+  });
+
   async function refreshAuth() {
     if (configMissing()) return;
     const { data, error } = await A.client.auth.getSession();
@@ -99,7 +127,7 @@
     logoutBtn.hidden = !currentUser;
     if (currentUser) {
       $('#signed-in-email').textContent = currentUser.email || '已登录';
-      await loadLibrary();
+      await Promise.all([loadIdentitySettings(), loadLibrary()]);
     }
   }
 
@@ -207,7 +235,8 @@
     const exif = [photo.formatted?.focalLength, photo.formatted?.aperture, photo.formatted?.shutter].filter(Boolean).join(' · ');
     return `<article class="admin-photo-card ${checked?'is-selected':''}" data-id="${escapeHtml(photo.id)}">
       <div class="admin-thumb-wrap">
-        <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.project || '照片')}" loading="lazy">
+        <img class="admin-thumb-blur" src="${escapeHtml(photo.url)}" alt="" aria-hidden="true" loading="lazy">
+        <img class="admin-thumb-main" src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.project || '照片')}" loading="lazy">
         <label class="admin-check" title="选择照片"><input type="checkbox" data-select-photo ${checked?'checked':''}><span>✓</span></label>
         <button type="button" class="admin-card-edit" data-edit title="编辑照片">编辑</button>
       </div>

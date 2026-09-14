@@ -189,9 +189,46 @@
       apertures: apertures.slice(0, 10), iso, years
     };
   }
+  const SETTINGS_PATH = 'site/site-settings.json';
+  let settingsCache = null;
+  async function loadSiteSettings(force = false) {
+    const fallback = { englishName: config.englishName || config.siteName || 'PHOTO ARCHIVE' };
+    if (!client) return fallback;
+    if (settingsCache && !force) return { ...fallback, ...settingsCache };
+    try {
+      const url = publicUrl(SETTINGS_PATH);
+      if (!url) return fallback;
+      const response = await fetch(`${url}?v=${Date.now()}`, { cache:'no-store' });
+      if (!response.ok) {
+        if (response.status === 404 || response.status === 400) return fallback;
+        throw new Error(`读取网站设置失败：${response.status}`);
+      }
+      const data = await response.json();
+      settingsCache = data && typeof data === 'object' ? data : {};
+      return { ...fallback, ...settingsCache };
+    } catch (error) {
+      console.warn('Site settings fallback:', error);
+      return fallback;
+    }
+  }
+  async function saveSiteSettings(next = {}) {
+    if (!client) throw new Error('Supabase 尚未连接');
+    const { data:{ session } } = await client.auth.getSession();
+    if (!session?.user) throw new Error('请先登录管理后台');
+    const current = await loadSiteSettings(true);
+    const payload = { ...current, ...next, updatedAt:new Date().toISOString() };
+    const body = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const { error } = await client.storage.from(BUCKET).upload(SETTINGS_PATH, body, {
+      contentType:'application/json', cacheControl:'60', upsert:true
+    });
+    if (error) throw error;
+    settingsCache = payload;
+    return payload;
+  }
+
   window.PhotoArchive = {
     config, configured, client, bucket: BUCKET, table: TABLE, escapeHtml, numberOrNull,
     cameraLabel, formatExposure, publicUrl, normalizePhoto, photoTime,
-    fetchPhotos, groupProjects, buildStats
+    fetchPhotos, groupProjects, buildStats, loadSiteSettings, saveSiteSettings
   };
 })();

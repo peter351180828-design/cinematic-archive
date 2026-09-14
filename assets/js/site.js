@@ -4,12 +4,18 @@
   const $ = (s, ctx = document) => ctx.querySelector(s);
   const $$ = (s, ctx = document) => [...ctx.querySelectorAll(s)];
 
-  // Config-driven labels.
-  $$('[data-site-name]').forEach(el => el.textContent = cfg.siteName || '摄影档案');
-  $$('[data-site-subtitle]').forEach(el => el.textContent = cfg.siteSubtitle || '摄影档案');
-  $$('[data-english-name]').forEach(el => el.textContent = cfg.englishName || 'PHOTO ARCHIVE');
-  $$('[data-about-intro]').forEach(el => el.textContent = cfg.aboutIntro || '把照片留给未来的自己。');
-  $$('[data-location]').forEach(el => el.textContent = cfg.location || '—');
+  // Config-driven labels + a site-wide English display name stored in Supabase Storage.
+  function applyIdentity(settings = {}) {
+    const englishName = String(settings.englishName || cfg.englishName || cfg.siteName || 'PHOTO ARCHIVE').trim() || 'PHOTO ARCHIVE';
+    $$('[data-site-name]').forEach(el => el.textContent = cfg.siteName || '摄影档案');
+    $$('[data-site-subtitle]').forEach(el => el.textContent = cfg.siteSubtitle || '摄影档案');
+    $$('[data-english-name]').forEach(el => el.textContent = englishName);
+    $$('[data-about-intro]').forEach(el => el.textContent = cfg.aboutIntro || '把照片留给未来的自己。');
+    $$('[data-location]').forEach(el => el.textContent = cfg.location || '—');
+    if (document.body.dataset.page === 'home') document.title = `${englishName} — PHOTO ARCHIVE`;
+  }
+  applyIdentity();
+  if (A?.loadSiteSettings) A.loadSiteSettings().then(applyIdentity).catch(()=>{});
 
   // Loader: only once per tab session.
   const loader = $('.cinematic-loader');
@@ -91,11 +97,11 @@
   const creativeBtn = $('[data-creative-toggle]');
   const creativeOn = localStorage.getItem('creative-mode') === '1';
   document.body.classList.toggle('creative-mode', creativeOn);
-  if (creativeBtn) creativeBtn.textContent = creativeOn ? '动效 ON' : '动效 OFF';
+  if (creativeBtn) creativeBtn.textContent = creativeOn ? 'CREATIVE ON' : 'CREATIVE OFF';
   creativeBtn?.addEventListener('click', () => {
     const on = document.body.classList.toggle('creative-mode');
     localStorage.setItem('creative-mode', on ? '1' : '0');
-    creativeBtn.textContent = on ? '动效 ON' : '动效 OFF';
+    creativeBtn.textContent = on ? 'CREATIVE ON' : 'CREATIVE OFF';
   });
 
 

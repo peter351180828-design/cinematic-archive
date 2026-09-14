@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=4"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=6"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
-  <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-site-name>咸鱼桑</span><small>摄影档案</small></a><nav class="site-nav"><a href="index.html" data-transition>作品</a><a href="archive.html" data-transition>档案</a><a href="stats.html" data-transition>数据</a><a href="about.html" data-transition>关于</a></nav><div class="header-side"><span id="auth-status">私人后台</span><button id="logout-button" type="button" hidden>退出</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
-  <div class="mobile-menu" data-mobile-menu><nav><a href="index.html">作品</a><a href="archive.html">档案</a><a href="stats.html">数据</a><a href="about.html">关于</a></nav></div>
+  <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span id="auth-status">PRIVATE</span><button id="logout-button" type="button" hidden>LOG OUT</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
+  <div class="mobile-menu" data-mobile-menu><nav><a href="index.html">WORK</a><a href="archive.html">ARCHIVE</a><a href="stats.html">DATA</a><a href="about.html">ABOUT</a></nav></div>
   <main><section class="admin-hero"><div class="eyebrow">PRIVATE ARCHIVE / CONTROL ROOM</div><h1><span class="accent-char">管</span>理后台</h1></section><div class="admin-shell">
     <section id="auth-gate" class="login-panel">
       <h2>登录后管理摄影档案</h2>
@@ -13,6 +13,15 @@
 
     <section id="admin-app" hidden>
       <div class="admin-status-bar"><span>已登录：<b id="signed-in-email"></b></span><span>原图 EXIF 在浏览器读取；网页 JPEG 不保存 GPS。</span></div>
+
+      <section class="admin-section-block admin-identity-block">
+        <div class="admin-section-title"><div><span class="eyebrow">IDENTITY</span><h2>英文用户名</h2></div><p>用于顶部品牌、首页主标题与开场动画。保存后整个网站都会读取同一个英文名称。</p></div>
+        <form id="identity-form" class="admin-identity-form">
+          <label>English Display Name<input id="english-display-name" type="text" maxlength="42" placeholder="例如：CONZIE" autocomplete="off"></label>
+          <button class="admin-button" type="submit">SAVE NAME</button>
+          <p id="identity-status" class="admin-message">未保存修改</p>
+        </form>
+      </section>
 
       <section class="admin-section-block">
         <div class="admin-section-title"><div><span class="eyebrow">UPLOAD</span><h2>追加照片</h2></div><p>选择已有摄影集直接追加；只有明确选择“新建摄影集”时才创建新系列。</p></div>
@@ -44,5 +53,5 @@
       </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=1"></script><script src="assets/js/site.js?v=4"></script><script src="assets/js/admin.js?v=4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=6"></script><script src="assets/js/site.js?v=6"></script><script src="assets/js/admin.js?v=6"></script>
 </body></html>

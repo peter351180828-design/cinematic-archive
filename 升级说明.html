@@ -1,16 +1,1 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>电影感 UI + 批量照片管理升级说明</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;max-width:900px;margin:50px auto;padding:0 24px;line-height:1.75;color:#171717}h1{font-size:40px;letter-spacing:-.04em}h2{margin-top:38px}code{background:#f3f1ed;padding:2px 6px;border-radius:4px}pre{background:#111;color:#eee;padding:18px;overflow:auto}li{margin:8px 0}.note{border-left:3px solid #111;padding:10px 18px;background:#f7f5f0}</style></head><body>
-<h1>电影感 UI + 批量照片管理升级</h1>
-<p>这个升级包专门用于你已经部署成功的 Cinematic Archive。它不会覆盖 <code>assets/js/config.js</code>，所以你现有的 Supabase URL、Publishable key 和照片数据不会被动到。</p>
-<h2>需要替换的 7 个文件</h2><pre>index.html
-project.html
-admin.html
-assets/css/site.css
-assets/js/archive-data.js
-assets/js/admin.js
-assets/js/site.js</pre>
-<h2>GitHub 网页操作</h2><ol><li>打开新站 GitHub 仓库。</li><li>分别进入对应路径，把上面 7 个文件替换为本升级包里的同名文件。</li><li>每次替换后点击 <b>Commit changes</b>。</li><li>全部完成后等待 GitHub Pages 自动发布。</li><li>Windows 按 <code>Ctrl + F5</code>；Mac 按 <code>Command + Shift + R</code> 强制刷新。</li></ol>
-<h2>首页变化</h2><p>恢复到最初那版的设计骨架：全屏 Hero、顶部三段式导航、Creative mode、Film rails，以及“作品 / 精选”的 Slider / List 双模式。摄影集在横向 Slider 中浏览，滚轮、触控板和拖动都可以横向切换。</p>
-<h2>详情页变化</h2><p>取消之前的左右交替时间线。照片按拍摄时间纵向自然展开、居中显示，并保持原始比例；EXIF 作为照片下方的信息带，不裁切照片。</p>
-<h2>照片管理变化</h2><p>后台“照片管理”会先选择摄影集，再显示缩略图网格。每张缩略图右上角都有圆形勾选框。</p><ul><li>点击缩略图或勾选框：选择 / 取消选择。</li><li>“全选当前摄影集”：一次选中当前筛选出的全部照片。</li><li>“取消选择”：清空选择。</li><li>“删除所选”：批量删除数据库记录和 Storage 图片，并有二次确认。</li><li>“编辑”：仍可修改标题、摄影集和备注。</li></ul>
-<div class="note"><b>重要：</b>不要用这个升级包替换 <code>assets/js/config.js</code>。你的 Supabase 配置继续沿用现在已经工作的那一份。</div>
-</body></html>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>V6 升级说明</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;max-width:900px;margin:60px auto;padding:0 24px;line-height:1.8;color:#181818}h1{font-size:42px}code{background:#f1f1f1;padding:2px 6px}li{margin:8px 0}.box{border:1px solid #ddd;padding:20px;margin:24px 0}</style></head><body><h1>V6 · Gold / Adaptive Hero / Album Manager</h1><div class="box"><strong>重要：</strong>本升级包不包含 <code>assets/js/config.js</code>，不会覆盖你已经可用的 Supabase URL 和 Publishable key。</div><h2>替换文件</h2><p>把升级包中的文件按原目录上传到 GitHub，并覆盖同名文件：</p><ul><li>index.html / archive.html / project.html / stats.html / about.html / admin.html</li><li>assets/css/site.css</li><li>assets/js/archive-data.js</li><li>assets/js/admin.js</li><li>assets/js/site.js</li><li>assets/js/supabase-client.js</li></ul><h2>本版变化</h2><ul><li>档案页删除「索引」模式，只保留图片浏览；卡片不再重复显示镜头/快门等 EXIF。</li><li>首页 Hero 会从最新摄影集中选择最接近当前屏幕比例的照片；比例差异较大时使用完整图像 + 模糊背景，不硬裁切主体。</li><li>首页文字改为暖金色；顶部 UI 改成 WORK / ARCHIVE / DATA / ABOUT / MANAGE。</li><li>管理后台新增 English Display Name，可保存英文用户名。设置保存在 Supabase Storage 的 <code>site/site-settings.json</code>，无需新建数据库表。</li><li>照片管理缩略图使用方形相册格：背景用同图模糊填充，前景完整 contain 显示，避免竖幅人像被切掉头部。</li></ul><h2>更新后</h2><p>GitHub Commit 后等待 Pages 重新部署，Windows 用 <code>Ctrl + F5</code>，Mac 用 <code>Command + Shift + R</code> 强制刷新。</p></body></html>
