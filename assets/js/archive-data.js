@@ -38,7 +38,67 @@
     return copy;
   }
 
-  const PHOTO_NAV_PREFIX = 'photo-nav-v21:';
+  // V22: mobile-safe deterministic shuffle. The seed travels in the URL so
+  // Safari / in-app browsers do not need sessionStorage to reconstruct the
+  // same random browsing deck after a tap/navigation.
+  function makeShuffleSeed() {
+    try {
+      const a = new Uint32Array(1);
+      crypto.getRandomValues(a);
+      return String(a[0] || Date.now());
+    } catch (_) {
+      return String((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
+    }
+  }
+  function seedToUint(seed) {
+    const str = String(seed || '1');
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function seededRandom(seed) {
+    let t = seedToUint(seed) || 0x6d2b79f5;
+    return () => {
+      t += 0x6D2B79F5;
+      let x = t;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seededShuffle(items, seed) {
+    const copy = [...items];
+    const rand = seededRandom(seed);
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+  function rotateFromId(items, clickedId) {
+    const clicked = String(clickedId ?? '');
+    const at = items.findIndex(item => String(item?.id ?? '') === clicked);
+    return at > 0 ? items.slice(at).concat(items.slice(0, at)) : [...items];
+  }
+  function withBrowseContext(href, { mode, seed = '', source = '', scope = '' } = {}) {
+    if (mode !== 'shuffle') return href;
+    try {
+      const url = new URL(href, location.href);
+      url.searchParams.set('browse', 'shuffle');
+      url.searchParams.set('seed', String(seed || '1'));
+      if (source) url.searchParams.set('source', source);
+      if (scope) url.searchParams.set('scope', scope);
+      else url.searchParams.delete('scope');
+      return `${url.pathname.split('/').pop()}${url.search}${url.hash}`;
+    } catch (_) {
+      return href;
+    }
+  }
+
+  const PHOTO_NAV_PREFIX = 'photo-nav-v22:';
   function makeNavToken() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;
   }
@@ -56,7 +116,7 @@
         : ids;
       const token = makeNavToken();
       sessionStorage.setItem(`${PHOTO_NAV_PREFIX}${token}`, JSON.stringify({
-        version: 21,
+        version: 22,
         source,
         mode,
         collection,
@@ -74,7 +134,7 @@
       const raw = sessionStorage.getItem(`${PHOTO_NAV_PREFIX}${token}`);
       if (!raw) return null;
       const state = JSON.parse(raw);
-      if (!state || state.version !== 21 || !Array.isArray(state.ids)) return null;
+      if (!state || state.version !== 22 || !Array.isArray(state.ids)) return null;
       if (Date.now() - Number(state.createdAt || 0) > 12 * 60 * 60 * 1000) {
         sessionStorage.removeItem(`${PHOTO_NAV_PREFIX}${token}`);
         return null;
@@ -539,12 +599,12 @@
       ['拍摄', e.dateTaken ? dateLabel(e.dateTaken) : null]
     ].filter(([,v]) => v != null && v !== '');
   }
-  function timelineItem(photo, index) {
+  function timelineItem(photo, index, browseContext = null) {
     const pairs = exifPairs(photo);
     const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
     const shape = w && h ? (h > w * 1.12 ? 'is-portrait' : w > h * 1.28 ? 'is-wide' : 'is-standard') : 'is-standard';
     return `<article class="project-flow-item ${shape} reveal">
-      <div class="project-flow-media"><a data-transition data-photo-id="${esc(photo.id)}" href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" decoding="async" fetchpriority="low" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
+      <div class="project-flow-media"><a data-transition data-photo-id="${esc(photo.id)}" href="${esc(withBrowseContext(`photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}`, browseContext || {}))}"><img loading="lazy" decoding="async" fetchpriority="low" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
       <div class="project-flow-caption">
         <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
         <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
@@ -584,10 +644,15 @@
 
     const orderButtons = $$('[data-project-order]');
     let orderMode = localStorage.getItem('project-order-mode') === 'shuffle' ? 'shuffle' : 'time';
+    let projectShuffleSeed = makeShuffleSeed();
     let currentProjectOrder = [];
     const renderProject = (reshuffle = false) => {
-      currentProjectOrder = orderMode === 'shuffle' ? shuffled(photos) : [...photos];
-      timeline.innerHTML = currentProjectOrder.map(timelineItem).join('');
+      if (orderMode === 'shuffle' && reshuffle) projectShuffleSeed = makeShuffleSeed();
+      currentProjectOrder = orderMode === 'shuffle' ? seededShuffle(photos, projectShuffleSeed) : [...photos];
+      const browseContext = orderMode === 'shuffle'
+        ? { mode:'shuffle', seed:projectShuffleSeed, source:'project', scope:collection }
+        : null;
+      timeline.innerHTML = currentProjectOrder.map((photo, index) => timelineItem(photo, index, browseContext)).join('');
       UI()?.activateReveals(timeline);
       orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.projectOrder === orderMode));
     };
@@ -607,6 +672,11 @@
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target.closest('a[data-photo-id]');
       if (!anchor) return;
+      if (orderMode === 'shuffle') {
+        anchor.href = withBrowseContext(anchor.href, {
+          mode:'shuffle', seed:projectShuffleSeed, source:'project', scope:collection
+        });
+      }
       const token = savePhotoNavState({
         source:'project',
         mode:orderMode,
@@ -629,9 +699,9 @@
     }
   }
 
-  function archiveCard(photo) {
+  function archiveCard(photo, browseContext = null) {
     return `<article class="archive-card" data-project="${esc(photo.project || '未分类')}">
-      <a data-transition data-photo-id="${esc(photo.id)}" href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}">
+      <a data-transition data-photo-id="${esc(photo.id)}" href="${esc(withBrowseContext(`photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}`, browseContext || {}))}">
         <img loading="lazy" decoding="async" fetchpriority="low" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
         <div class="archive-card-meta"><span>${esc(photo.project || '未分类')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span></div>
       </a>
@@ -655,6 +725,8 @@
     let ordered = [];
     let rendered = 0;
     let sentinelObserver = null;
+    let archiveShuffleSeed = makeShuffleSeed();
+    let archiveScope = '';
 
     const sentinel = document.createElement('div');
     sentinel.className = 'archive-load-sentinel';
@@ -668,7 +740,10 @@
       }
       const size = rendered === 0 ? FIRST_BATCH : NEXT_BATCH;
       const batch = ordered.slice(rendered, rendered + size);
-      grid.insertAdjacentHTML('beforeend', batch.map(archiveCard).join(''));
+      const browseContext = orderMode === 'shuffle'
+        ? { mode:'shuffle', seed:archiveShuffleSeed, source:'archive', scope:archiveScope }
+        : null;
+      grid.insertAdjacentHTML('beforeend', batch.map(photo => archiveCard(photo, browseContext)).join(''));
       rendered += batch.length;
       sentinel.hidden = rendered >= ordered.length;
       // Archive cards intentionally skip reveal observers. With hundreds of
@@ -690,7 +765,9 @@
     const rebuild = (reroll = false) => {
       const visible = filter.value ? publicPhotos.filter(p=>(p.project||'未分类')===filter.value) : publicPhotos;
       const chronological = [...visible].sort((a,b) => (A.photoTime?.(b) || 0) - (A.photoTime?.(a) || 0));
-      ordered = orderMode === 'shuffle' ? shuffled(chronological) : chronological;
+      archiveScope = filter.value || '';
+      if (orderMode === 'shuffle' && reroll) archiveShuffleSeed = makeShuffleSeed();
+      ordered = orderMode === 'shuffle' ? seededShuffle(chronological, archiveShuffleSeed) : chronological;
       rendered = 0;
       grid.innerHTML = '';
       count.textContent = `${visible.length} 张照片`;
@@ -716,6 +793,11 @@
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target.closest('a[data-photo-id]');
       if (!anchor) return;
+      if (orderMode === 'shuffle') {
+        anchor.href = withBrowseContext(anchor.href, {
+          mode:'shuffle', seed:archiveShuffleSeed, source:'archive', scope:filter.value || ''
+        });
+      }
       const token = savePhotoNavState({
         source:'archive',
         mode:orderMode,
@@ -738,6 +820,10 @@
     const initialId = params.get('id');
     const initialCollection = params.get('collection');
     const navToken = params.get('nav') || '';
+    const urlBrowseMode = params.get('browse') === 'shuffle' ? 'shuffle' : '';
+    const urlBrowseSeed = params.get('seed') || '';
+    const urlBrowseSource = params.get('source') || '';
+    const urlBrowseScope = params.get('scope') || '';
     if (!initialId) { root.innerHTML = '<div class="photo-view-error">没有指定照片。</div>'; return; }
 
     const [allPhotos, settings] = await Promise.all([
@@ -755,7 +841,19 @@
     let mode = navState?.mode || 'time';
     let sourceCollection = navState?.collection || initialCollection || '';
 
-    if (navState?.ids?.includes(String(initialId))) {
+    // URL context is the mobile-safe source of truth for SHUFFLE. It makes the
+    // tapped image 01/N and keeps a finite deck, even if sessionStorage is lost
+    // during a touch navigation or an in-app browser page transition.
+    if (urlBrowseMode === 'shuffle' && urlBrowseSeed) {
+      let scoped = urlBrowseScope
+        ? publicPhotos.filter(photo => (photo.project || '未分类') === urlBrowseScope)
+        : publicPhotos;
+      const chronological = [...scoped].sort((a,b) => (A.photoTime?.(b) || 0) - (A.photoTime?.(a) || 0));
+      sequence = rotateFromId(seededShuffle(chronological, urlBrowseSeed), initialId);
+      source = urlBrowseSource || (urlBrowseScope ? 'project' : 'archive');
+      mode = 'shuffle';
+      sourceCollection = source === 'project' ? (urlBrowseScope || initialCollection || '') : '';
+    } else if (navState?.ids?.includes(String(initialId))) {
       sequence = navState.ids.map(id => byId.get(String(id))).filter(Boolean);
     }
 
