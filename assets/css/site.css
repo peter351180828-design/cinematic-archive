@@ -1230,3 +1230,180 @@ body[data-page="about"] .about-manifesto small{font-size:12px;line-height:1.6;ma
   .photo-view-actions{grid-template-columns:1fr 1fr}
   .photo-view-actions a{grid-column:1/-1;grid-row:1}
 }
+
+/* ======================================================================
+   V17 — desktop admin density + cinematic edge navigation
+   ====================================================================== */
+
+/* ADMIN — keep the control room dense and readable on desktop rather than
+   letting each utility section expand to the full ultrawide viewport. */
+body[data-page="admin"] main{
+  width:min(calc(100vw - 56px),1440px);
+  margin:0 auto;
+  padding:96px 0 92px;
+}
+body[data-page="admin"] .admin-hero{
+  padding:26px 0 30px;
+  border-bottom:1px solid var(--line);
+}
+body[data-page="admin"] .admin-hero h1{
+  margin:12px 0 0;
+  font-size:clamp(58px,6.5vw,96px);
+  line-height:.84;
+}
+body[data-page="admin"] .admin-shell{padding:0 0 30px}
+body[data-page="admin"] .admin-status-bar{
+  padding:12px 0;
+  font-size:11px;
+  line-height:1.45;
+}
+body[data-page="admin"] .admin-section-block{
+  padding:34px 0 42px;
+}
+body[data-page="admin"] .admin-section-title{
+  display:grid;
+  grid-template-columns:minmax(240px,.72fr) minmax(0,1.28fr);
+  gap:28px 46px;
+  align-items:end;
+  margin-bottom:20px;
+}
+body[data-page="admin"] .admin-section-title h2{
+  font-size:clamp(30px,3.4vw,50px);
+  line-height:.94;
+  margin-top:4px;
+}
+body[data-page="admin"] .admin-section-title p{
+  justify-self:end;
+  max-width:620px;
+  font-size:12px;
+  line-height:1.55;
+}
+body[data-page="admin"] .admin-identity-form,
+body[data-page="admin"] .collection-rename-form,
+body[data-page="admin"] .collection-intro-form,
+body[data-page="admin"] .storage-quota-form{
+  max-width:980px;
+}
+body[data-page="admin"] .storage-dashboard{
+  grid-template-columns:minmax(220px,300px) minmax(0,1fr);
+  gap:30px;
+  align-items:stretch;
+  padding:4px 0 18px;
+}
+body[data-page="admin"] .storage-primary{
+  align-content:end;
+  padding-bottom:8px;
+}
+body[data-page="admin"] .storage-primary strong{
+  font-size:clamp(46px,4.8vw,72px);
+  line-height:.82;
+}
+body[data-page="admin"] .storage-metrics div{
+  min-height:72px;
+  padding:11px 12px;
+  gap:8px;
+}
+body[data-page="admin"] .storage-metrics b{font-size:clamp(16px,1.5vw,23px)}
+body[data-page="admin"] .collection-visibility-row{padding:11px 0}
+body[data-page="admin"] .collection-visibility-copy b{font-size:clamp(18px,1.6vw,24px)}
+body[data-page="admin"] .admin-panel{
+  grid-template-columns:minmax(290px,360px) minmax(0,1fr);
+  gap:34px;
+  padding:12px 0 10px;
+}
+body[data-page="admin"] .admin-drop{
+  min-height:230px;
+  padding:24px;
+}
+body[data-page="admin"] .admin-drop strong{font-size:clamp(28px,3.3vw,48px)}
+body[data-page="admin"] .admin-form{gap:14px}
+body[data-page="admin"] .admin-form input,
+body[data-page="admin"] .admin-form textarea,
+body[data-page="admin"] .admin-form select{font-size:15px;padding:9px 0}
+body[data-page="admin"] .admin-form textarea{min-height:74px}
+body[data-page="admin"] .admin-library-controls{padding:12px 0}
+body[data-page="admin"] .admin-selection-toolbar{
+  top:72px;
+  padding:10px 0;
+}
+body[data-page="admin"] .admin-photo-grid{
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:10px;
+  padding-top:16px;
+}
+body[data-page="admin"] .admin-card-meta{padding-top:6px}
+body[data-page="admin"] .admin-card-meta b{font-size:11px}
+body[data-page="admin"] .admin-card-meta span{font-size:8px}
+body[data-page="admin"] .admin-check{
+  width:28px;height:28px;right:8px;top:8px;
+}
+
+/* PHOTO VIEWER — translucent edge controls borrow the site's film-gate language.
+   They remain visible enough to discover without sitting on top of the subject. */
+.photo-view-media{position:relative}
+.photo-view-edge-nav{
+  position:absolute;
+  z-index:8;
+  top:50%;
+  transform:translateY(-50%);
+  width:58px;
+  height:104px;
+  border:1px solid rgba(228,207,153,.26);
+  background:rgba(5,7,7,.26);
+  color:rgba(228,207,153,.72);
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:2px;
+  cursor:pointer;
+  backdrop-filter:blur(12px) saturate(115%);
+  -webkit-backdrop-filter:blur(12px) saturate(115%);
+  transition:background .22s,border-color .22s,color .22s,opacity .22s,transform .22s;
+  opacity:.62;
+}
+.photo-view-edge-nav.is-prev{left:14px}
+.photo-view-edge-nav.is-next{right:14px}
+.photo-view-edge-nav span{
+  font:400 54px/.72 var(--serif);
+  transform:translateY(-1px);
+}
+.photo-view-edge-nav small{
+  font:7px var(--mono);
+  letter-spacing:.09em;
+}
+.photo-view-edge-nav:hover{
+  opacity:1;
+  color:var(--home-gold);
+  background:rgba(5,7,7,.58);
+  border-color:rgba(228,207,153,.58);
+  transform:translateY(-50%) scale(1.035);
+}
+.photo-view-edge-nav:disabled{
+  opacity:.12;
+  cursor:default;
+  pointer-events:none;
+}
+
+@media(max-width:1380px){
+  body[data-page="admin"] .admin-photo-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+@media(max-width:1120px){
+  body[data-page="admin"] main{width:calc(100vw - 36px)}
+  body[data-page="admin"] .admin-photo-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  body[data-page="admin"] .storage-dashboard{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  body[data-page="admin"] main{width:calc(100vw - 28px);padding-top:84px}
+  body[data-page="admin"] .admin-section-title{display:block}
+  body[data-page="admin"] .admin-section-title p{margin-top:12px;justify-self:auto}
+  body[data-page="admin"] .admin-panel{grid-template-columns:1fr}
+  body[data-page="admin"] .admin-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .photo-view-edge-nav{width:46px;height:76px;opacity:.72}
+  .photo-view-edge-nav.is-prev{left:7px}.photo-view-edge-nav.is-next{right:7px}
+  .photo-view-edge-nav span{font-size:42px}.photo-view-edge-nav small{display:none}
+}
+@media(max-width:560px){
+  body[data-page="admin"] .admin-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .photo-view-edge-nav{width:40px;height:62px}
+  .photo-view-edge-nav span{font-size:36px}
+}

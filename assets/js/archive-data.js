@@ -535,10 +535,18 @@
       if (!target) return;
       location.href = `photo.html?id=${encodeURIComponent(target.id)}&collection=${collectionQuery}`;
     };
-    const prevBtn = $('#photo-view-prev'), nextBtn = $('#photo-view-next');
-    prevBtn.disabled = !prev; nextBtn.disabled = !next;
-    prevBtn.addEventListener('click', () => go(prev));
-    nextBtn.addEventListener('click', () => go(next));
+    const prevBtns = [$('#photo-view-prev'), $('#photo-view-prev-edge')].filter(Boolean);
+    const nextBtns = [$('#photo-view-next'), $('#photo-view-next-edge')].filter(Boolean);
+    prevBtns.forEach(btn => {
+      btn.disabled = !prev;
+      btn.setAttribute('aria-disabled', String(!prev));
+      btn.addEventListener('click', () => go(prev));
+    });
+    nextBtns.forEach(btn => {
+      btn.disabled = !next;
+      btn.setAttribute('aria-disabled', String(!next));
+      btn.addEventListener('click', () => go(next));
+    });
     document.addEventListener('keydown', event => {
       if (event.key === 'ArrowLeft' && prev) go(prev);
       if (event.key === 'ArrowRight' && next) go(next);
