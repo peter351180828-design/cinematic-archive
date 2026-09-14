@@ -93,21 +93,25 @@
       </article>`;
   }
   function mountAutoFilmSlider(slider, projectCount) {
-    if (!slider || projectCount < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!slider || projectCount < 2) return;
 
-    let cardHover = false;
-    let interacting = false;
+    let hoverPaused = false;
+    let manualPaused = false;
     let resumeTimer = null;
     let raf = null;
     let last = performance.now();
-    const speed = 30; // px / second: visible but still deliberately cinematic.
+    let carry = 0;
+    let pointerHasMoved = false;
+    const speed = 38; // px / second — slow, but clearly perceptible.
 
-    // The loop distance must be measured between the first original card and
-    // the first cloned card. Using clone.offsetLeft directly includes the
-    // slider's left padding and causes a visible jump at the wrap point.
+    const originals = () => [...slider.querySelectorAll('.home-project-card:not([data-loop-clone="true"])')];
+    const firstClone = () => slider.querySelector('[data-loop-start="true"]');
+
+    // Exact distance occupied by the original film strip. The cloned strip begins
+    // at the same visual position one cycle later, so wrapping is seamless.
     const loopDistance = () => {
-      const first = slider.querySelector('.home-project-card:not([data-loop-clone="true"])');
-      const clone = slider.querySelector('[data-loop-start="true"]');
+      const first = originals()[0];
+      const clone = firstClone();
       if (!first || !clone) return 0;
       return Math.max(0, clone.offsetLeft - first.offsetLeft);
     };
@@ -115,55 +119,97 @@
     const normalize = () => {
       const distance = loopDistance();
       if (!distance) return;
-      while (slider.scrollLeft >= distance) slider.scrollLeft -= distance;
-      while (slider.scrollLeft < 0) slider.scrollLeft += distance;
+      if (slider.scrollLeft >= distance) slider.scrollLeft -= distance;
+      else if (slider.scrollLeft < 0) slider.scrollLeft += distance;
     };
 
     const tick = now => {
-      const dt = Math.min(50, Math.max(0, now - last));
+      const dt = Math.min(64, Math.max(0, now - last));
       last = now;
-      const canMove = !cardHover && !interacting && !document.hidden && !slider.hidden && innerWidth > 820;
+      const canMove = !hoverPaused && !manualPaused && !document.hidden && !slider.hidden && innerWidth > 820;
       if (canMove && slider.scrollWidth > slider.clientWidth + 4) {
-        slider.scrollLeft += speed * dt / 1000;
-        normalize();
+        // Some browsers visually quantize element scrolling to whole pixels.
+        // Accumulate the fractional distance ourselves and only commit integer
+        // pixels, so the strip always advances instead of appearing frozen.
+        carry += speed * dt / 1000;
+        const step = Math.floor(carry);
+        if (step >= 1) {
+          slider.scrollLeft += step;
+          carry -= step;
+          normalize();
+        }
       }
       raf = requestAnimationFrame(tick);
     };
 
-    const delayResume = (delay = 1200) => {
+    const pauseForManualInput = (delay = 1400) => {
       clearTimeout(resumeTimer);
-      interacting = true;
+      manualPaused = true;
       resumeTimer = setTimeout(() => {
-        interacting = false;
+        manualPaused = false;
+        carry = 0;
         last = performance.now();
       }, delay);
     };
 
-    // Pause only over an actual project card. The previous version paused as
-    // soon as the pointer entered the whole slider, which covers most of the
-    // viewport and made the automatic movement appear broken.
-    slider.querySelectorAll('.home-project-card').forEach(card => {
-      card.addEventListener('pointerenter', () => { cardHover = true; });
-      card.addEventListener('pointerleave', () => { cardHover = false; last = performance.now(); });
-      card.addEventListener('focusin', () => { cardHover = true; });
-      card.addEventListener('focusout', e => {
-        if (!card.contains(e.relatedTarget)) { cardHover = false; last = performance.now(); }
-      });
+    // Important: do NOT pause merely because the page was loaded with the mouse
+    // already resting over a card. We only arm hover-pause after a real pointer
+    // movement, so autoplay is always visible on entry.
+    slider.addEventListener('pointermove', e => {
+      pointerHasMoved = true;
+      hoverPaused = !!e.target.closest('.home-project-card');
+    }, { passive:true });
+    slider.addEventListener('pointerleave', () => {
+      hoverPaused = false;
+      last = performance.now();
+    });
+    slider.addEventListener('pointerover', e => {
+      if (!pointerHasMoved) return;
+      if (e.target.closest('.home-project-card')) hoverPaused = true;
+    });
+    slider.addEventListener('pointerout', e => {
+      if (!pointerHasMoved) return;
+      const fromCard = e.target.closest?.('.home-project-card');
+      const toCard = e.relatedTarget?.closest?.('.home-project-card');
+      if (fromCard && !toCard) {
+        hoverPaused = false;
+        last = performance.now();
+      }
     });
 
-    // Manual browsing temporarily takes priority; the film resumes by itself.
-    slider.addEventListener('wheel', () => delayResume(1600), { passive:true });
-    slider.addEventListener('pointerdown', () => { interacting = true; clearTimeout(resumeTimer); });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type =>
-      slider.addEventListener(type, () => delayResume(1200))
-    );
-    document.addEventListener('visibilitychange', () => { last = performance.now(); });
+    // Keyboard focus also pauses so links remain usable.
+    slider.addEventListener('focusin', e => {
+      if (e.target.closest('.home-project-card')) hoverPaused = true;
+    });
+    slider.addEventListener('focusout', e => {
+      if (!slider.contains(e.relatedTarget)) {
+        hoverPaused = false;
+        last = performance.now();
+      }
+    });
 
-    // A short start delay lets eager cover images settle before motion begins.
+    // Manual browsing temporarily wins; autoplay resumes automatically.
+    slider.addEventListener('wheel', () => pauseForManualInput(1800), { passive:true });
+    slider.addEventListener('pointerdown', () => {
+      clearTimeout(resumeTimer);
+      manualPaused = true;
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type =>
+      slider.addEventListener(type, () => pauseForManualInput(1200))
+    );
+    document.addEventListener('visibilitychange', () => {
+      carry = 0;
+      last = performance.now();
+    });
+
+    // Start even when the OS requests reduced motion because this moving film
+    // strip is an explicitly requested core browsing feature. The dedicated
+    // motion switch in the site UI can still be used to disable effects.
     setTimeout(() => {
+      carry = 0;
       last = performance.now();
       raf = requestAnimationFrame(tick);
-    }, 450);
+    }, 650);
 
     addEventListener('pagehide', () => {
       clearTimeout(resumeTimer);
