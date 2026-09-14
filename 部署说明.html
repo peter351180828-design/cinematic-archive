@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>新电影感摄影站 · 零基础部署说明</title>
+<style>
+body{margin:0;background:#eee9df;color:#111;font-family:"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65}main{max-width:980px;margin:auto;padding:48px 24px 120px}h1{font-size:clamp(46px,8vw,92px);line-height:.92;letter-spacing:-.06em;margin:20px 0 40px}h2{font-size:28px;margin:0 0 12px}p{font-size:16px}.intro{font-size:20px;max-width:760px}.step{border-top:1px solid #aaa39a;padding:34px 0;display:grid;grid-template-columns:90px 1fr;gap:24px}.num{font:700 38px/1 Georgia,serif;font-style:italic}.box{background:#161616;color:#f2efe8;padding:18px 20px;border-radius:2px;overflow:auto}code{font-family:Consolas,monospace}.ok{border-left:4px solid #111;padding-left:16px}.warn{border-left:4px solid #9b542f;padding-left:16px}.copy{border:1px solid #111;background:transparent;padding:8px 11px;cursor:pointer}a{color:inherit}.small{font-size:13px;color:#68635b}@media(max-width:650px){.step{grid-template-columns:1fr}.num{font-size:26px}}
+</style>
+</head>
+<body><main>
+<p class="small">CINEMATIC PHOTO ARCHIVE / 零基础部署说明</p>
+<h1>新站单独部署，<br>旧站完全保留。</h1>
+<p class="intro">这次不动你现在的 <b>Peter.github.io</b> 测试站。我们另外创建一个 GitHub 仓库作为正式电影感网站，但继续读取你已经上传到 Supabase 的照片，所以不需要重新上传 52 张，也不增加一份云端照片存储。</p>
+
+<section class="step"><div class="num">00</div><div><h2>先确认：不要删除旧站</h2><p>你现在的旧测试站继续留在 GitHub。下面所有操作都在一个<strong>新的仓库</strong>里完成。</p><p class="ok">旧站：继续做测试。新站：作为 Jason Bergh 方向的正式视觉站。两个站共享同一份照片数据。</p></div></section>
+
+<section class="step"><div class="num">01</div><div><h2>解压我给你的 ZIP</h2><p>下载并解压 <b>xianyusang_cinematic_archive.zip</b>。打开文件夹后，你应该直接看到：</p><div class="box"><code>index.html<br>project.html<br>archive.html<br>stats.html<br>about.html<br>admin.html<br>assets/<br>setup/<br>README.md<br>部署说明.html</code></div><p class="warn">上传 GitHub 时要上传这些“解压后的文件和文件夹”，不要直接上传 ZIP。</p></div></section>
+
+<section class="step"><div class="num">02</div><div><h2>GitHub 新建仓库</h2><p>打开 GitHub。右上角点 <b>＋</b> → <b>New repository</b>。</p><p>Repository name 填：</p><div class="box"><code>cinematic-archive</code></div><p>选择 <b>Public</b>，然后点 <b>Create repository</b>。其他选项先不要勾。</p></div></section>
+
+<section class="step"><div class="num">03</div><div><h2>把新站文件上传进去</h2><p>新仓库创建后，在蓝色 Quick setup 区域点击 <b>uploading an existing file</b>。</p><p>把解压文件夹里的全部内容拖进去。确认上传列表里同时存在：</p><div class="box"><code>assets/<br>setup/<br>index.html<br>admin.html<br>...</code></div><p>滚到底部点 <b>Commit changes</b>。</p></div></section>
+
+<section class="step"><div class="num">04</div><div><h2>复制旧站已经成功的 Supabase 配置</h2><p>打开你旧站的 GitHub 仓库 <b>Peter.github.io</b>。</p><p>依次点击：</p><div class="box"><code>assets → js → config.js</code></div><p>找到已经能正常工作的两行：</p><div class="box"><code>supabaseUrl: 'https://xxxxxxxx.supabase.co',<br>supabaseKey: 'sb_publishable_xxxxxxxxx',</code></div><p>把这两个值复制下来。</p><p class="warn">只复制 Publishable key。绝对不要复制 Secret key。</p></div></section>
+
+<section class="step"><div class="num">05</div><div><h2>把两个值填进新站</h2><p>回到新仓库 <b>cinematic-archive</b>。</p><p>点击：</p><div class="box"><code>assets → js → config.js → 铅笔 Edit</code></div><p>把占位内容替换为你刚复制的真实值：</p><div class="box"><code>supabaseUrl: 'https://你的项目ID.supabase.co',<br>supabaseKey: 'sb_publishable_你的完整key',</code></div><p>如果你想修改名字，也可以同时改：</p><div class="box"><code>siteName: '咸鱼桑',<br>englishName: 'XIAN YU SANG',</code></div><p>然后点击 <b>Commit changes</b>。</p></div></section>
+
+<section class="step"><div class="num">06</div><div><h2>这次 Supabase 不需要重新设置</h2><p>因为新站默认继续使用旧站已经成功运行的：</p><ul><li><b>photos</b> 数据表</li><li><b>photos</b> Storage bucket</li><li>你现有的登录账号</li><li>已经修好的 RLS 权限</li></ul><p class="ok">所以不要重新建 Bucket，也不要重新运行 SQL。你原来的照片会直接被新站读取。</p></div></section>
+
+<section class="step"><div class="num">07</div><div><h2>开启 GitHub Pages</h2><p>新仓库顶部点击 <b>Settings</b> → 左侧 <b>Pages</b>。</p><p>在 Build and deployment 里：</p><div class="box"><code>Source → Deploy from a branch<br>Branch → main<br>Folder → /(root)<br>Save</code></div><p>等待大约 1–3 分钟。</p></div></section>
+
+<section class="step"><div class="num">08</div><div><h2>打开新网站</h2><p>你的 GitHub 用户名目前是 <b>peter351180828-design</b>，所以新站地址应为：</p><div class="box"><code>https://peter351180828-design.github.io/cinematic-archive/</code></div><p>后台：</p><div class="box"><code>https://peter351180828-design.github.io/cinematic-archive/admin.html</code></div><p>仍然使用你原来 Supabase 的邮箱和密码登录。</p></div></section>
+
+<section class="step"><div class="num">09</div><div><h2>确认旧照片已经出现</h2><p>打开新站首页。正常情况下，不需要重新上传，原来 Supabase 里的摄影集会直接出现在电影感首页。</p><p>再检查：</p><ul><li>首页：摄影集有封面</li><li>档案：不显示 DSC 文件名，照片不裁切</li><li>详情：左右轮次排列，中间动态引导线</li><li>数据：总数、设备、焦段等统计可见</li></ul></div></section>
+
+<section class="step"><div class="num">10</div><div><h2>以后追加照片</h2><p>进入新站 <b>admin.html</b>。</p><p>上传区会先显示已有摄影集，例如：</p><div class="box"><code>ChinaJoy 2026 · 52 张<br>＋ 新建摄影集</code></div><p>选择已有摄影集后上传，照片会<strong>继续追加到这个摄影集</strong>，不会每次新建一个同名系列。</p></div></section>
+
+<section class="step"><div class="num">11</div><div><h2>如果新站显示“尚未连接”</h2><p>最常见原因只有一个：新仓库的 <b>assets/js/config.js</b> 还没有复制正确。</p><p>直接在浏览器打开：</p><div class="box"><code>https://peter351180828-design.github.io/cinematic-archive/assets/js/config.js</code></div><p>确认里面已经能看到真实的 <b>supabase.co</b> URL 和 <b>sb_publishable_</b> key，而不是 PASTE_ 开头的占位文字。</p></div></section>
+
+<section class="step"><div class="num">12</div><div><h2>如果看到旧页面</h2><p>GitHub Pages 更新后浏览器可能还缓存旧文件。强制刷新：</p><div class="box"><code>Windows：Ctrl + F5<br>Mac：Command + Shift + R</code></div></div></section>
+
+<section class="step"><div class="num">13</div><div><h2>以后想把新站变成主站</h2><p>先不用现在做。等新站稳定后，我们可以再把它迁移到根地址或自己的域名。当前阶段保持两个站并存最安全。</p></div></section>
+
+<p class="small">备用：如果未来你新建完全独立的 Supabase 项目，才使用 setup/01_fresh_supabase.sql。现在不需要。</p>
+</main></body></html>
