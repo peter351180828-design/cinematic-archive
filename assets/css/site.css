@@ -1703,3 +1703,37 @@ body:not([data-page="home"]) .admin-thumb-wrap img{
   body[data-page="home"] .home-project-frame{aspect-ratio:1/1}
   body[data-page="home"] .home-project-title{font-size:clamp(40px,13vw,64px)}
 }
+
+/* ======================================================================
+   V21 — finite photo navigation sessions + lower continuous paint cost
+   ====================================================================== */
+
+/* Keep the texture as a static material on information-heavy pages. The HOME
+   entrance may keep a slow cinematic drift, but Archive/Project/Viewer/Data/
+   About no longer repaint a full-screen fixed grain layer continuously. */
+body:not([data-page="home"]) .film-grain{
+  animation:none!important;
+  will-change:auto;
+}
+body[data-page="home"] .film-grain{
+  animation-duration:1.15s;
+}
+
+/* Single-photo navigation swaps in place instead of reloading the whole page.
+   A very small fade masks decoder latency without creating another heavy
+   animation surface. */
+.photo-view-media img{
+  transition:opacity .16s ease;
+}
+.photo-view-media img.is-switching{
+  opacity:.38;
+}
+
+/* The segmented archive now uses smaller batches; cards do not need reveal
+   transforms/observers, so they can paint as soon as a lazy image is ready. */
+body[data-page="archive"] .archive-card{
+  opacity:1!important;
+  transform:none!important;
+  transition:none!important;
+  contain-intrinsic-size:auto 340px;
+}

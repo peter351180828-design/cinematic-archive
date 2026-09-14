@@ -37,6 +37,61 @@
     }
     return copy;
   }
+
+  const PHOTO_NAV_PREFIX = 'photo-nav-v21:';
+  function makeNavToken() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`;
+  }
+  function savePhotoNavState({ source, mode, items, clickedId, collection = '' }) {
+    try {
+      const ids = items.map(item => String(item?.id ?? '')).filter(Boolean);
+      const clicked = String(clickedId ?? '');
+      const at = ids.indexOf(clicked);
+      if (at < 0) return '';
+      // In SHUFFLE mode the selected image becomes 01/N, then the remaining
+      // shuffled deck continues exactly once and stops at the end. This avoids
+      // opening a random image as 45/45 while also preventing endless looping.
+      const sequence = mode === 'shuffle'
+        ? ids.slice(at).concat(ids.slice(0, at))
+        : ids;
+      const token = makeNavToken();
+      sessionStorage.setItem(`${PHOTO_NAV_PREFIX}${token}`, JSON.stringify({
+        version: 21,
+        source,
+        mode,
+        collection,
+        ids: sequence,
+        createdAt: Date.now()
+      }));
+      return token;
+    } catch (_) {
+      return '';
+    }
+  }
+  function readPhotoNavState(token) {
+    if (!token) return null;
+    try {
+      const raw = sessionStorage.getItem(`${PHOTO_NAV_PREFIX}${token}`);
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      if (!state || state.version !== 21 || !Array.isArray(state.ids)) return null;
+      if (Date.now() - Number(state.createdAt || 0) > 12 * 60 * 60 * 1000) {
+        sessionStorage.removeItem(`${PHOTO_NAV_PREFIX}${token}`);
+        return null;
+      }
+      return state;
+    } catch (_) {
+      return null;
+    }
+  }
+  function attachNavToken(anchor, token) {
+    if (!anchor || !token) return;
+    try {
+      const url = new URL(anchor.href, location.href);
+      url.searchParams.set('nav', token);
+      anchor.href = url.toString();
+    } catch (_) {}
+  }
   function heroCandidates(photos) {
     const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
     const scored = photos.filter(p => p?.url).map((photo, index) => {
@@ -489,7 +544,7 @@
     const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
     const shape = w && h ? (h > w * 1.12 ? 'is-portrait' : w > h * 1.28 ? 'is-wide' : 'is-standard') : 'is-standard';
     return `<article class="project-flow-item ${shape} reveal">
-      <div class="project-flow-media"><a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" decoding="async" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
+      <div class="project-flow-media"><a data-transition data-photo-id="${esc(photo.id)}" href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}"><img loading="lazy" decoding="async" fetchpriority="low" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></a></div>
       <div class="project-flow-caption">
         <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
         <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
@@ -529,9 +584,10 @@
 
     const orderButtons = $$('[data-project-order]');
     let orderMode = localStorage.getItem('project-order-mode') === 'shuffle' ? 'shuffle' : 'time';
+    let currentProjectOrder = [];
     const renderProject = (reshuffle = false) => {
-      const ordered = orderMode === 'shuffle' ? shuffled(photos) : photos;
-      timeline.innerHTML = ordered.map(timelineItem).join('');
+      currentProjectOrder = orderMode === 'shuffle' ? shuffled(photos) : [...photos];
+      timeline.innerHTML = currentProjectOrder.map(timelineItem).join('');
       UI()?.activateReveals(timeline);
       orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.projectOrder === orderMode));
     };
@@ -543,6 +599,23 @@
       renderProject(reroll);
     }));
     renderProject();
+
+    // Preserve the exact visible order when entering the single-photo viewer.
+    // A shuffled collection becomes a one-pass random deck starting at the
+    // clicked image; chronological mode keeps its actual position.
+    timeline.addEventListener('click', event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target.closest('a[data-photo-id]');
+      if (!anchor) return;
+      const token = savePhotoNavState({
+        source:'project',
+        mode:orderMode,
+        items:currentProjectOrder,
+        clickedId:anchor.dataset.photoId,
+        collection
+      });
+      attachNavToken(anchor, token);
+    });
 
     const all = await photosSafe();
     const publicAll = all ? (A?.filterVisiblePhotos ? A.filterVisiblePhotos(all, siteSettings) : all) : [];
@@ -557,9 +630,9 @@
   }
 
   function archiveCard(photo) {
-    return `<article class="archive-card reveal" data-project="${esc(photo.project || '未分类')}">
-      <a data-transition href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}">
-        <img loading="lazy" decoding="async" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
+    return `<article class="archive-card" data-project="${esc(photo.project || '未分类')}">
+      <a data-transition data-photo-id="${esc(photo.id)}" href="photo.html?id=${encodeURIComponent(photo.id)}&collection=${encodeURIComponent(photo.project || '未分类')}">
+        <img loading="lazy" decoding="async" fetchpriority="low" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}">
         <div class="archive-card-meta"><span>${esc(photo.project || '未分类')}</span><span>${esc(dateLabel(photo.exif?.dateTaken || photo.uploadedAt))}</span></div>
       </a>
     </article>`;
@@ -577,8 +650,8 @@
 
     // Segment the archive so hundreds of photographs are not inserted into the DOM at once.
     // The first screen loads a useful contact sheet; more cards append as the user approaches the bottom.
-    const FIRST_BATCH = innerWidth >= 1500 ? 60 : innerWidth >= 900 ? 48 : 24;
-    const NEXT_BATCH = innerWidth >= 900 ? 36 : 20;
+    const FIRST_BATCH = innerWidth >= 1500 ? 36 : innerWidth >= 900 ? 28 : 18;
+    const NEXT_BATCH = innerWidth >= 900 ? 20 : 14;
     let ordered = [];
     let rendered = 0;
     let sentinelObserver = null;
@@ -598,8 +671,8 @@
       grid.insertAdjacentHTML('beforeend', batch.map(archiveCard).join(''));
       rendered += batch.length;
       sentinel.hidden = rendered >= ordered.length;
-      // Only newly appended cards become reveal targets; old cards stay untouched.
-      UI()?.activateReveals(grid);
+      // Archive cards intentionally skip reveal observers. With hundreds of
+      // large photographs, immediate paint + lazy image decoding is smoother.
     };
 
     const setupObserver = () => {
@@ -607,7 +680,7 @@
       if (!('IntersectionObserver' in window)) return;
       sentinelObserver = new IntersectionObserver(entries => {
         if (entries.some(entry => entry.isIntersecting)) appendBatch();
-      }, { rootMargin:'900px 0px', threshold:0 });
+      }, { rootMargin:'520px 0px', threshold:0 });
       sentinelObserver.observe(sentinel);
     };
 
@@ -636,6 +709,23 @@
     filter.addEventListener('change', rebuild);
     rebuild();
 
+    // Capture the current Archive order before the transition handler runs.
+    // In SHUFFLE, the clicked photo starts a finite random viewing session at
+    // 01/N; in TIME, the viewer retains the true chronological position.
+    grid.addEventListener('click', event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target.closest('a[data-photo-id]');
+      if (!anchor) return;
+      const token = savePhotoNavState({
+        source:'archive',
+        mode:orderMode,
+        items:ordered,
+        clickedId:anchor.dataset.photoId,
+        collection:filter.value || ''
+      });
+      attachNavToken(anchor, token);
+    });
+
     addEventListener('pagehide', () => sentinelObserver?.disconnect(), { once:true });
   }
 
@@ -643,59 +733,145 @@
     if (page !== 'photo') return;
     const root = $('#photo-view-root');
     if (!A?.configured) { root.innerHTML = setupNotice(); return; }
+
     const params = new URLSearchParams(location.search);
-    const id = params.get('id');
-    const collection = params.get('collection');
-    if (!id) { root.innerHTML = '<div class="photo-view-error">没有指定照片。</div>'; return; }
+    const initialId = params.get('id');
+    const initialCollection = params.get('collection');
+    const navToken = params.get('nav') || '';
+    if (!initialId) { root.innerHTML = '<div class="photo-view-error">没有指定照片。</div>'; return; }
 
     const [allPhotos, settings] = await Promise.all([
       photosSafe(),
       A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})
     ]);
     if (!allPhotos) { root.innerHTML = '<div class="photo-view-error">照片读取失败，请检查网络。</div>'; return; }
+
     const publicPhotos = A?.filterVisiblePhotos ? A.filterVisiblePhotos(allPhotos, settings) : allPhotos;
-    let scoped = collection ? publicPhotos.filter(p => (p.project || '未分类') === collection) : publicPhotos;
-    if (!scoped.some(p => String(p.id) === String(id))) scoped = publicPhotos;
-    scoped = [...scoped].sort((a,b) => (A.photoTime?.(a) || 0) - (A.photoTime?.(b) || 0));
-    const index = scoped.findIndex(p => String(p.id) === String(id));
-    const photo = index >= 0 ? scoped[index] : null;
-    if (!photo) { root.innerHTML = '<div class="photo-view-error">这张照片不存在，或所属摄影集已隐藏。</div>'; return; }
+    const byId = new Map(publicPhotos.map(photo => [String(photo.id), photo]));
+    const navState = readPhotoNavState(navToken);
+
+    let sequence = [];
+    let source = navState?.source || 'direct';
+    let mode = navState?.mode || 'time';
+    let sourceCollection = navState?.collection || initialCollection || '';
+
+    if (navState?.ids?.includes(String(initialId))) {
+      sequence = navState.ids.map(id => byId.get(String(id))).filter(Boolean);
+    }
+
+    // Direct links still work without a stored browsing session.
+    if (!sequence.length) {
+      let scoped = initialCollection
+        ? publicPhotos.filter(photo => (photo.project || '未分类') === initialCollection)
+        : publicPhotos;
+      scoped = [...scoped].sort((a,b) => (A.photoTime?.(a) || 0) - (A.photoTime?.(b) || 0));
+      sequence = scoped;
+      source = initialCollection ? 'project' : 'archive';
+      mode = 'time';
+      sourceCollection = initialCollection || '';
+    }
+
+    let currentIndex = sequence.findIndex(photo => String(photo.id) === String(initialId));
+    if (currentIndex < 0) {
+      const fallback = byId.get(String(initialId));
+      if (!fallback) {
+        root.innerHTML = '<div class="photo-view-error">这张照片不存在，或所属摄影集已隐藏。</div>';
+        return;
+      }
+      sequence = [fallback];
+      currentIndex = 0;
+    }
 
     const img = $('#photo-view-image');
-    img.src = photo.url;
-    img.alt = photo.project || '摄影作品';
-    $('#photo-view-index').textContent = `${String(index + 1).padStart(2,'0')} / ${String(scoped.length).padStart(2,'0')}`;
-    $('#photo-view-date').textContent = dateLabel(photo.exif?.dateTaken || photo.uploadedAt);
-    $('#photo-view-collection').textContent = photo.project || '未分类';
-    const pairs = exifPairs(photo);
-    $('#photo-view-exif').innerHTML = pairs.length
-      ? pairs.map(([label,value]) => `<div><small>${esc(label)}</small><b>${esc(value)}</b></div>`).join('')
-      : '<div><small>EXIF</small><b>无可读信息</b></div>';
-
-    const prev = scoped[index - 1] || null;
-    const next = scoped[index + 1] || null;
-    const collectionQuery = encodeURIComponent(photo.project || '未分类');
-    const go = target => {
-      if (!target) return;
-      location.href = `photo.html?id=${encodeURIComponent(target.id)}&collection=${collectionQuery}`;
-    };
     const prevBtns = [$('#photo-view-prev'), $('#photo-view-prev-edge')].filter(Boolean);
     const nextBtns = [$('#photo-view-next'), $('#photo-view-next-edge')].filter(Boolean);
-    prevBtns.forEach(btn => {
-      btn.disabled = !prev;
-      btn.setAttribute('aria-disabled', String(!prev));
-      btn.addEventListener('click', () => go(prev));
-    });
-    nextBtns.forEach(btn => {
-      btn.disabled = !next;
-      btn.setAttribute('aria-disabled', String(!next));
-      btn.addEventListener('click', () => go(next));
-    });
+    const backLink = $('.photo-view-actions a');
+    let renderVersion = 0;
+
+    const destinationForBack = () => {
+      if (source === 'project' && sourceCollection) {
+        return `project.html?collection=${encodeURIComponent(sourceCollection)}`;
+      }
+      return 'archive.html';
+    };
+    if (backLink) backLink.href = destinationForBack();
+
+    const preloadNeighbor = photo => {
+      if (!photo?.url) return;
+      const preload = new Image();
+      preload.decoding = 'async';
+      preload.src = photo.url;
+    };
+
+    const renderAt = async (index, { push = false } = {}) => {
+      if (index < 0 || index >= sequence.length) return;
+      currentIndex = index;
+      const photo = sequence[currentIndex];
+      const version = ++renderVersion;
+
+      document.title = `${photo.project || 'PHOTO'} — ${A.config.siteName || 'Photo Archive'}`;
+      $('#photo-view-index').textContent = `${String(currentIndex + 1).padStart(2,'0')} / ${String(sequence.length).padStart(2,'0')}${mode === 'shuffle' ? ' · SHUFFLE' : ''}`;
+      $('#photo-view-date').textContent = dateLabel(photo.exif?.dateTaken || photo.uploadedAt);
+      $('#photo-view-collection').textContent = photo.project || '未分类';
+
+      const pairs = exifPairs(photo);
+      $('#photo-view-exif').innerHTML = pairs.length
+        ? pairs.map(([label,value]) => `<div><small>${esc(label)}</small><b>${esc(value)}</b></div>`).join('')
+        : '<div><small>EXIF</small><b>无可读信息</b></div>';
+
+      const prev = sequence[currentIndex - 1] || null;
+      const next = sequence[currentIndex + 1] || null;
+      prevBtns.forEach(btn => {
+        btn.disabled = !prev;
+        btn.setAttribute('aria-disabled', String(!prev));
+      });
+      nextBtns.forEach(btn => {
+        btn.disabled = !next;
+        btn.setAttribute('aria-disabled', String(!next));
+      });
+
+      if (push) {
+        const url = new URL(location.href);
+        url.searchParams.set('id', photo.id);
+        url.searchParams.set('collection', photo.project || '未分类');
+        if (navToken) url.searchParams.set('nav', navToken);
+        history.pushState({ photoId:String(photo.id) }, '', url);
+      }
+
+      img.alt = photo.project || '摄影作品';
+      if (img.src !== photo.url) {
+        img.classList.add('is-switching');
+        img.src = photo.url;
+        try { await img.decode(); } catch (_) {}
+        if (version === renderVersion) img.classList.remove('is-switching');
+      }
+
+      preloadNeighbor(prev);
+      preloadNeighbor(next);
+    };
+
+    const goDelta = delta => {
+      const targetIndex = currentIndex + delta;
+      if (targetIndex < 0 || targetIndex >= sequence.length) return;
+      renderAt(targetIndex, { push:true });
+    };
+
+    prevBtns.forEach(btn => btn.addEventListener('click', () => goDelta(-1)));
+    nextBtns.forEach(btn => btn.addEventListener('click', () => goDelta(1)));
+
     document.addEventListener('keydown', event => {
-      if (event.key === 'ArrowLeft' && prev) go(prev);
-      if (event.key === 'ArrowRight' && next) go(next);
-      if (event.key === 'Escape') location.href = `project.html?collection=${collectionQuery}`;
+      if (event.key === 'ArrowLeft') goDelta(-1);
+      if (event.key === 'ArrowRight') goDelta(1);
+      if (event.key === 'Escape') location.href = destinationForBack();
     });
+
+    addEventListener('popstate', () => {
+      const id = new URLSearchParams(location.search).get('id');
+      const at = sequence.findIndex(photo => String(photo.id) === String(id));
+      if (at >= 0) renderAt(at, { push:false });
+    });
+
+    await renderAt(currentIndex, { push:false });
   }
 
   function renderBars(el,items){
