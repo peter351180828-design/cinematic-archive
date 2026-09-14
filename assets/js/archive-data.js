@@ -370,49 +370,86 @@
     // Every visit starts in the cinematic horizontal film-strip view. LIST remains an optional temporary view.
     setView('slider');
 
-    // Horizontal wheel + drag. Pointer capture starts only AFTER a real drag.
-    // This is important: capturing on pointerdown retargeted normal clicks to the
-    // slider in some browsers, which made project cards look unclickable.
+    // Free horizontal film movement — no card snapping.
+    // Trackpads keep their native pixel-by-pixel feel; mouse/pen dragging gets
+    // direct 1:1 movement plus a short inertial glide after release.
     slider.addEventListener('wheel', e => {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       e.preventDefault();
-      slider.scrollLeft += e.deltaY * .9;
+      slider.scrollLeft += e.deltaY;
     }, {passive:false});
 
     let pointerDown = false, dragging = false, dragMoved = false;
     let dragPointerId = null, startX = 0, startScroll = 0;
+    let lastX = 0, lastT = 0, velocity = 0, inertiaRaf = null;
+
+    const stopInertia = () => {
+      if (inertiaRaf) cancelAnimationFrame(inertiaRaf);
+      inertiaRaf = null;
+    };
+
+    const startInertia = () => {
+      stopInertia();
+      // velocity is pointer px/ms; scroll moves in the opposite direction.
+      let v = -velocity * 16.67;
+      if (Math.abs(v) < .35) return;
+      const step = () => {
+        v *= .935;
+        if (Math.abs(v) < .22) {
+          inertiaRaf = null;
+          return;
+        }
+        slider.scrollLeft += v;
+        inertiaRaf = requestAnimationFrame(step);
+      };
+      inertiaRaf = requestAnimationFrame(step);
+    };
 
     slider.addEventListener('pointerdown', e => {
+      // Let touch screens use the browser's native kinetic horizontal scrolling.
+      if (e.pointerType === 'touch') return;
       if (e.button != null && e.button !== 0) return;
+      stopInertia();
       pointerDown = true;
       dragging = false;
       dragMoved = false;
       dragPointerId = e.pointerId;
-      startX = e.clientX;
+      startX = lastX = e.clientX;
       startScroll = slider.scrollLeft;
+      lastT = performance.now();
+      velocity = 0;
     });
 
     slider.addEventListener('pointermove', e => {
       if (!pointerDown || e.pointerId !== dragPointerId) return;
       const dx = e.clientX - startX;
-      if (!dragging && Math.abs(dx) > 8) {
+      if (!dragging && Math.abs(dx) > 4) {
         dragging = true;
         dragMoved = true;
+        slider.classList.add('is-dragging');
         slider.setPointerCapture?.(e.pointerId);
       }
       if (!dragging) return;
       e.preventDefault();
+      const now = performance.now();
+      const dt = Math.max(1, now - lastT);
+      velocity = (e.clientX - lastX) / dt;
+      lastX = e.clientX;
+      lastT = now;
       slider.scrollLeft = startScroll - dx;
     }, {passive:false});
 
-    const finishDrag = e => {
+    const finishDrag = () => {
       if (dragging && slider.hasPointerCapture?.(dragPointerId)) {
         try { slider.releasePointerCapture(dragPointerId); } catch (_) {}
       }
+      const wasDragging = dragging;
       pointerDown = false;
       dragging = false;
       dragPointerId = null;
-      if (dragMoved) setTimeout(() => { dragMoved = false; }, 280);
+      slider.classList.remove('is-dragging');
+      if (wasDragging) startInertia();
+      if (dragMoved) setTimeout(() => { dragMoved = false; }, 340);
     };
     ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, finishDrag));
 
@@ -481,7 +518,10 @@
     $$('[data-project-camera]').forEach(el => el.textContent = A.buildStats(photos).primaryCamera || '多设备');
 
     const intro = String(siteSettings?.collectionDescriptions?.[collection] || '').trim();
-    $$('[data-project-description]').forEach(el => el.textContent = intro || '这个摄影集还没有简介。');
+    $$('[data-project-description]').forEach(el => {
+      el.textContent = intro;
+      el.hidden = !intro;
+    });
 
     const orderButtons = $$('[data-project-order]');
     let orderMode = localStorage.getItem('project-order-mode') === 'shuffle' ? 'shuffle' : 'time';
@@ -526,27 +566,73 @@
     if (!A?.configured) { grid.innerHTML = setupNotice(); return; }
     const [photos, siteSettings] = await Promise.all([photosSafe(), A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})]);
     if (!photos) { grid.innerHTML = '<div class="archive-empty">读取失败，请检查网络。</div>'; return; }
+
     const publicPhotos = A?.filterVisiblePhotos ? A.filterVisiblePhotos(photos, siteSettings) : photos;
     const projects = [...new Set(publicPhotos.map(p=>p.project || '未分类'))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
     filter.insertAdjacentHTML('beforeend', projects.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join(''));
 
-    const orderButtons = $$('[data-archive-order]');
-    let orderMode = localStorage.getItem('archive-order-mode') === 'shuffle' ? 'shuffle' : 'time';
-    const render = () => {
-      const visible = filter.value ? publicPhotos.filter(p=>(p.project||'未分类')===filter.value) : publicPhotos;
-      const ordered = orderMode === 'shuffle' ? shuffled(visible) : visible;
-      count.textContent = `${visible.length} 张照片`;
-      grid.innerHTML = ordered.map(archiveCard).join('');
-      orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.archiveOrder === orderMode));
+    // Segment the archive so hundreds of photographs are not inserted into the DOM at once.
+    // The first screen loads a useful contact sheet; more cards append as the user approaches the bottom.
+    const FIRST_BATCH = innerWidth >= 1500 ? 60 : innerWidth >= 900 ? 48 : 24;
+    const NEXT_BATCH = innerWidth >= 900 ? 36 : 20;
+    let ordered = [];
+    let rendered = 0;
+    let sentinelObserver = null;
+
+    const sentinel = document.createElement('div');
+    sentinel.className = 'archive-load-sentinel';
+    sentinel.setAttribute('aria-hidden','true');
+    grid.insertAdjacentElement('afterend', sentinel);
+
+    const appendBatch = () => {
+      if (rendered >= ordered.length) {
+        sentinel.hidden = true;
+        return;
+      }
+      const size = rendered === 0 ? FIRST_BATCH : NEXT_BATCH;
+      const batch = ordered.slice(rendered, rendered + size);
+      grid.insertAdjacentHTML('beforeend', batch.map(archiveCard).join(''));
+      rendered += batch.length;
+      sentinel.hidden = rendered >= ordered.length;
+      // Only newly appended cards become reveal targets; old cards stay untouched.
       UI()?.activateReveals(grid);
     };
+
+    const setupObserver = () => {
+      sentinelObserver?.disconnect();
+      if (!('IntersectionObserver' in window)) return;
+      sentinelObserver = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) appendBatch();
+      }, { rootMargin:'900px 0px', threshold:0 });
+      sentinelObserver.observe(sentinel);
+    };
+
+    const orderButtons = $$('[data-archive-order]');
+    let orderMode = localStorage.getItem('archive-order-mode') === 'shuffle' ? 'shuffle' : 'time';
+
+    const rebuild = (reroll = false) => {
+      const visible = filter.value ? publicPhotos.filter(p=>(p.project||'未分类')===filter.value) : publicPhotos;
+      const chronological = [...visible].sort((a,b) => (A.photoTime?.(b) || 0) - (A.photoTime?.(a) || 0));
+      ordered = orderMode === 'shuffle' ? shuffled(chronological) : chronological;
+      rendered = 0;
+      grid.innerHTML = '';
+      count.textContent = `${visible.length} 张照片`;
+      orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.archiveOrder === orderMode));
+      appendBatch();
+      setupObserver();
+    };
+
     orderButtons.forEach(btn => btn.addEventListener('click', () => {
       const nextMode = btn.dataset.archiveOrder === 'shuffle' ? 'shuffle' : 'time';
+      const reroll = nextMode === 'shuffle' && orderMode === 'shuffle';
       orderMode = nextMode;
       localStorage.setItem('archive-order-mode', orderMode);
-      render();
+      rebuild(reroll);
     }));
-    filter.addEventListener('change',render); render();
+    filter.addEventListener('change', rebuild);
+    rebuild();
+
+    addEventListener('pagehide', () => sentinelObserver?.disconnect(), { once:true });
   }
 
   async function initPhotoView() {
