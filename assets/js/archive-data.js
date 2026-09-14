@@ -468,7 +468,11 @@
         row.addEventListener('pointerleave', () => preview.classList.remove('is-visible'));
       });
     }
-    mountAutoFilmSlider(slider, projects.length);
+    // Desktop keeps the continuous auto-film engine. On small screens the CSS
+    // intentionally turns the originals into a vertical, touch-safe collection
+    // sheet and hides loop clones, so every collection is reachable by normal
+    // page scrolling and remains tappable.
+    if (innerWidth > 820) mountAutoFilmSlider(slider, projects.length);
     UI()?.activateReveals(slider);
   }
 
