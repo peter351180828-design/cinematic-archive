@@ -671,3 +671,281 @@ body[data-page="home"] .home-nav a:hover::after{transform:scaleX(1)}
   .collection-visibility-switch{gap:8px}
   .collection-visibility-switch em{display:none}
 }
+
+
+/* ======================================================================
+   V9 — floating glass capsule + rotating adaptive hero + denser photo grids
+   ====================================================================== */
+:root{
+  --v9-header-max:1180px;
+  --v9-header-bg:rgba(7,8,8,.18);
+  --v9-header-bg-scrolled:rgba(7,8,8,.68);
+  --v9-header-line:rgba(228,207,153,.20);
+}
+
+/* The global header no longer spans edge-to-edge across photography.
+   It behaves as a compact floating instrument panel and gains stronger glass on scroll. */
+.site-header,
+body[data-page="home"] .site-header.home-header{
+  inset:14px auto auto 50%;
+  width:min(calc(100vw - 32px),var(--v9-header-max));
+  height:54px;
+  transform:translateX(-50%);
+  padding:0 18px;
+  border-radius:999px;
+  grid-template-columns:minmax(170px,1fr) auto minmax(170px,1fr);
+  overflow:visible;
+}
+.site-header::before{
+  inset:0;
+  border-radius:inherit;
+  background:var(--v9-header-bg);
+  border:1px solid rgba(228,207,153,.10);
+  box-shadow:0 8px 28px rgba(0,0,0,.06);
+  backdrop-filter:blur(8px) saturate(110%);
+  -webkit-backdrop-filter:blur(8px) saturate(110%);
+}
+.site-header.is-scrolled,
+body[data-page="home"] .site-header.home-header.is-scrolled{
+  height:54px;
+}
+.site-header.is-scrolled::before{
+  background:var(--v9-header-bg-scrolled);
+  border-color:var(--v9-header-line);
+  backdrop-filter:blur(22px) saturate(145%);
+  -webkit-backdrop-filter:blur(22px) saturate(145%);
+  box-shadow:0 18px 52px rgba(0,0,0,.28);
+}
+.site-header.is-deep-scrolled::before{background:rgba(7,8,8,.78)}
+.site-nav,body[data-page="home"] .home-nav{gap:clamp(16px,1.7vw,30px)}
+.site-nav a,body[data-page="home"] .home-nav a{font-size:9px}
+.site-brand{min-width:0}
+.site-brand span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-side,.home-header-tools{font-size:9px;gap:14px}
+
+/* Home hero crossfade. The JS chooses only images near the viewport ratio;
+   extreme portrait/wide files are still displayed complete over a blurred copy. */
+.cinema-hero-bg{inset:0}
+.cinema-hero-slide{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  transition:opacity 1.35s cubic-bezier(.22,.78,.12,1);
+  pointer-events:none;
+}
+.cinema-hero-slide.is-active{opacity:1}
+.cinema-hero-slide.is-leaving{opacity:0}
+.cinema-hero-slide .cinema-hero-backdrop,
+.cinema-hero-slide .cinema-hero-image{position:absolute;inset:0;width:100%;height:100%}
+.cinema-hero-slide .cinema-hero-backdrop{
+  inset:-4%;
+  width:108%;
+  height:108%;
+  object-fit:cover;
+  filter:blur(30px) saturate(.72) brightness(.34);
+  transform:scale(1.05);
+  opacity:.92;
+}
+.cinema-hero-slide .cinema-hero-image{
+  object-fit:contain;
+  object-position:center center;
+  filter:saturate(.78) contrast(1.06) brightness(.72);
+  transition:transform 1.15s cubic-bezier(.22,.78,.12,1),filter .8s;
+}
+.cinema-hero-slide[data-fit="cover"] .cinema-hero-image{object-fit:cover}
+body.creative-mode .cinema-hero-slide .cinema-hero-image{
+  transform:scale(1.018);
+  filter:saturate(.94) contrast(1.1) brightness(.72);
+}
+
+/* Archive controls become a compact floating glass pill instead of a black strip
+   cutting through the first row of photographs. */
+.archive-controls{
+  position:sticky;
+  top:82px;
+  z-index:28;
+  width:max-content;
+  max-width:calc(100vw - 36px);
+  margin:20px auto 0;
+  padding:10px 14px;
+  border:1px solid rgba(228,207,153,.18);
+  border-radius:999px;
+  background:rgba(8,9,9,.60);
+  backdrop-filter:blur(18px) saturate(135%);
+  -webkit-backdrop-filter:blur(18px) saturate(135%);
+  box-shadow:0 14px 44px rgba(0,0,0,.20);
+  display:flex;
+  align-items:center;
+  gap:18px;
+}
+.archive-filter-control{display:flex;align-items:center;gap:10px}
+.archive-filter-control .eyebrow{font-size:8px;margin:0}
+.archive-controls select{
+  min-width:160px;
+  padding:4px 20px 4px 0;
+  border-bottom:0;
+  font-size:11px;
+}
+.archive-count{white-space:nowrap;font-size:9px}
+.archive-order-toolbar,
+.project-order-toolbar{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font:9px var(--mono);
+  letter-spacing:.06em;
+  color:var(--paper-3);
+}
+.archive-order-toolbar>span,
+.project-order-toolbar>span{margin-right:5px;color:var(--home-gold-muted)}
+.archive-order-toolbar button,
+.project-order-toolbar button{
+  border:1px solid rgba(228,207,153,.18);
+  background:transparent;
+  color:var(--home-gold-muted);
+  padding:6px 9px;
+  cursor:pointer;
+  transition:background .2s,color .2s,border-color .2s;
+}
+.archive-order-toolbar button:hover,
+.project-order-toolbar button:hover{color:var(--home-gold);border-color:rgba(228,207,153,.40)}
+.archive-order-toolbar button.is-active,
+.project-order-toolbar button.is-active{
+  color:#0a0a0a;
+  background:var(--home-gold);
+  border-color:var(--home-gold);
+}
+
+/* Archive: explicit grid instead of oversized masonry columns.
+   The full photograph stays visible; density changes with screen width. */
+.archive-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:clamp(42px,5vw,86px) clamp(14px,1.4vw,26px);
+  column-count:unset;
+  padding:52px clamp(18px,2.1vw,40px) 120px;
+  align-items:start;
+}
+.archive-card,
+.archive-card:nth-child(n){
+  display:block;
+  width:100%;
+  margin:0;
+  padding:0;
+  break-inside:auto;
+}
+.archive-card img{
+  width:100%;
+  height:auto;
+  object-fit:contain;
+  background:#090a0a;
+}
+.archive-card-meta{font-size:11px}
+.archive-card-meta span:last-child{font-size:8px}
+
+/* Project detail: a contact-sheet rhythm on desktop rather than one enormous image per screen. */
+.project-hero-clean{
+  min-height:52svh;
+  padding-top:116px;
+  padding-bottom:48px;
+}
+.project-hero-title{font-size:clamp(62px,8vw,132px)}
+.project-intro{max-width:540px}
+.project-order-toolbar{margin-top:24px}
+
+.project-film-flow{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:clamp(58px,6vw,100px) clamp(16px,1.7vw,30px);
+  padding:58px clamp(18px,2.1vw,40px) 120px;
+  align-items:start;
+}
+.project-flow-item,
+.project-flow-item.is-portrait,
+.project-flow-item.is-wide{
+  width:100%;
+  display:block;
+}
+.project-flow-media,
+.project-flow-item.is-portrait .project-flow-media,
+.project-flow-item.is-wide .project-flow-media{
+  width:100%;
+  display:block;
+}
+.project-flow-media img{
+  width:100%;
+  height:auto;
+  max-height:none;
+  object-fit:contain;
+  background:#090a0a;
+}
+.project-flow-caption,
+.project-flow-item.is-portrait .project-flow-caption,
+.project-flow-item.is-wide .project-flow-caption{
+  width:100%;
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr);
+  gap:12px;
+  margin-top:9px;
+  padding-top:8px;
+}
+.project-flow-index{font-size:9px}
+.project-flow-exif{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px 12px;
+}
+.project-flow-exif div{min-width:0}
+.project-flow-exif small{font-size:8px}
+.project-flow-exif b{font-size:12px;overflow-wrap:anywhere}
+.project-flow-caption .photo-note{grid-column:2;font-size:12px;margin-top:8px}
+
+@media(min-width:1680px){
+  .archive-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .project-film-flow{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:1180px){
+  .archive-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .project-film-flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .site-header,body[data-page="home"] .site-header.home-header{width:calc(100vw - 24px)}
+}
+@media(max-width:980px){
+  .site-header,body[data-page="home"] .site-header.home-header{
+    inset:10px auto auto 50%;
+    width:calc(100vw - 20px);
+    height:52px;
+    grid-template-columns:1fr auto;
+    padding:0 14px;
+  }
+  .archive-controls{
+    top:72px;
+    width:calc(100vw - 28px);
+    justify-content:space-between;
+    border-radius:16px;
+    gap:12px;
+  }
+  .archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding-top:34px}
+  .project-film-flow{grid-template-columns:repeat(2,minmax(0,1fr));padding-top:42px}
+}
+@media(max-width:640px){
+  .archive-controls{
+    position:relative;
+    top:auto;
+    margin:16px 14px 0;
+    width:auto;
+    display:grid;
+    grid-template-columns:1fr auto;
+    border-radius:14px;
+  }
+  .archive-filter-control{grid-column:1/-1;justify-content:space-between}
+  .archive-order-toolbar{justify-self:start}
+  .archive-count{justify-self:end}
+  .archive-grid{grid-template-columns:1fr;padding:30px 14px 84px;gap:54px}
+  .project-film-flow{grid-template-columns:1fr;padding:36px 16px 84px;gap:70px}
+  .project-flow-caption{grid-template-columns:34px minmax(0,1fr)}
+  .project-flow-exif{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .project-hero-clean{min-height:auto;padding-top:100px}
+}
+@media(prefers-reduced-motion:reduce){
+  .cinema-hero-slide{transition:none}
+}

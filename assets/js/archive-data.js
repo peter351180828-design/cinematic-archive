@@ -25,38 +25,83 @@
     return `<span class="accent-char">${esc(str.slice(0,1))}</span>${esc(str.slice(1))}`;
   }
 
-  function chooseHeroPhoto(photos, projectName) {
-    const candidates = photos.filter(p => (p.project || '未分类') === projectName && p.url);
-    if (!candidates.length) return null;
-    const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
-    const scored = candidates.map((photo, index) => {
-      const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
-      const ratio = w && h ? w / h : null;
-      const ratioScore = ratio ? Math.abs(Math.log(ratio / viewportRatio)) : 3;
-      const featuredBonus = photo.isFeatured ? -.3 : 0;
-      return { photo, score:ratioScore + featuredBonus + index * .00001 };
-    }).sort((a,b)=>a.score-b.score);
-    return scored[0].photo;
+  function photoRatio(photo) {
+    const w = Number(photo?.exif?.width || 0), h = Number(photo?.exif?.height || 0);
+    return w > 0 && h > 0 ? w / h : null;
   }
-
-  function mountAdaptiveHero(container, photo) {
+  function shuffled(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+  function heroCandidates(photos) {
+    const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+    const scored = photos.filter(p => p?.url).map((photo, index) => {
+      const ratio = photoRatio(photo);
+      const ratioScore = ratio ? Math.abs(Math.log(ratio / viewportRatio)) : 2.8;
+      const featuredBonus = photo.isFeatured ? -.28 : 0;
+      return { photo, score:ratioScore + featuredBonus + index * .000001 };
+    }).sort((a,b)=>a.score-b.score);
+    const poolSize = Math.min(Math.max(6, Math.ceil(scored.length * .22)), 18);
+    return shuffled(scored.slice(0, poolSize).map(x => x.photo));
+  }
+  function heroFit(photo, img) {
+    const w = Number(photo?.exif?.width || img?.naturalWidth || 0);
+    const h = Number(photo?.exif?.height || img?.naturalHeight || 0);
+    if (!w || !h) return 'contain';
+    const relative = (w / h) / (Math.max(1, innerWidth) / Math.max(1, innerHeight));
+    return relative > .80 && relative < 1.24 ? 'cover' : 'contain';
+  }
+  function setHeroPhoto(container, photo, immediate = false) {
     if (!container || !photo?.url) return;
     const safe = esc(photo.url);
-    container.innerHTML = `<img class="cinema-hero-backdrop" src="${safe}" alt="" aria-hidden="true"><img class="cinema-hero-image" src="${safe}" alt="${esc(photo.project || 'Hero image')}">`;
-    const main = container.querySelector('.cinema-hero-image');
-    const decide = () => {
-      const w = Number(photo.exif?.width || main?.naturalWidth || 0);
-      const h = Number(photo.exif?.height || main?.naturalHeight || 0);
-      if (!w || !h) return container.dataset.fit = 'contain';
-      const imageRatio = w / h;
-      const viewportRatio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
-      const relative = imageRatio / viewportRatio;
-      // Near the viewport ratio: permit only modest cropping. Extreme portrait/wide images stay fully visible.
-      container.dataset.fit = relative > .78 && relative < 1.28 ? 'cover' : 'contain';
-    };
+    const slide = document.createElement('div');
+    slide.className = 'cinema-hero-slide';
+    slide.innerHTML = `<img class="cinema-hero-backdrop" src="${safe}" alt="" aria-hidden="true"><img class="cinema-hero-image" src="${safe}" alt="${esc(photo.project || 'Hero image')}">`;
+    const main = slide.querySelector('.cinema-hero-image');
+    const decide = () => { slide.dataset.fit = heroFit(photo, main); };
     main?.addEventListener('load', decide, { once:true });
     decide();
-    addEventListener('resize', decide, { passive:true });
+    container.appendChild(slide);
+    const previous = [...container.querySelectorAll('.cinema-hero-slide.is-active')].find(el => el !== slide);
+    requestAnimationFrame(() => {
+      slide.classList.add('is-active');
+      if (previous) previous.classList.add('is-leaving');
+    });
+    if (previous) setTimeout(() => previous.remove(), immediate ? 0 : 1500);
+  }
+  function mountAdaptiveHeroCarousel(container, photos) {
+    if (!container || !photos?.length) return;
+    let pool = heroCandidates(photos), index = 0, timer = null;
+    if (!pool.length) return;
+    setHeroPhoto(container, pool[0], true);
+
+    const next = () => {
+      if (document.hidden || pool.length < 2) return;
+      index = (index + 1) % pool.length;
+      if (index === 0) pool = shuffled(pool);
+      setHeroPhoto(container, pool[index]);
+    };
+    const start = () => {
+      clearInterval(timer);
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(next, 8500);
+    };
+    start();
+
+    let resizeTimer = null;
+    addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const currentUrl = container.querySelector('.cinema-hero-slide.is-active .cinema-hero-image')?.src;
+        pool = heroCandidates(photos);
+        const found = pool.findIndex(p => p.url === currentUrl);
+        index = found >= 0 ? found : 0;
+      }, 260);
+    }, { passive:true });
+    document.addEventListener('visibilitychange', () => document.hidden ? clearInterval(timer) : start());
   }
 
   async function updateCount() {
@@ -103,8 +148,7 @@
 
     const projects = A.groupProjects(publicPhotos);
     if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
-    const heroPhoto = projects[0] ? (chooseHeroPhoto(publicPhotos, projects[0].name) || projects[0].cover) : null;
-    if (heroBg && heroPhoto?.url) mountAdaptiveHero(heroBg, heroPhoto);
+    if (heroBg) mountAdaptiveHeroCarousel(heroBg, publicPhotos);
 
     slider.innerHTML = projects.map((project, i) => `
       <article class="home-project-card reveal">
@@ -211,9 +255,26 @@
     $$('[data-project-year]').forEach(el => el.textContent = year);
     $$('[data-project-count]').forEach(el => el.textContent = `${photos.length} 张`);
     $$('[data-project-camera]').forEach(el => el.textContent = A.buildStats(photos).primaryCamera || '多设备');
-    $$('[data-project-description]').forEach(el => el.textContent = `按拍摄时间排列的 ${photos.length} 个瞬间。照片保持原始比例，EXIF 作为独立信息带保留。`);
-    timeline.innerHTML = photos.map(timelineItem).join('');
-    UI()?.activateReveals(timeline);
+
+    const orderButtons = $$('[data-project-order]');
+    let orderMode = localStorage.getItem('project-order-mode') === 'shuffle' ? 'shuffle' : 'time';
+    const renderProject = (reshuffle = false) => {
+      const ordered = orderMode === 'shuffle' ? shuffled(photos) : photos;
+      timeline.innerHTML = ordered.map(timelineItem).join('');
+      UI()?.activateReveals(timeline);
+      orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.projectOrder === orderMode));
+      $$('[data-project-description]').forEach(el => el.textContent = orderMode === 'shuffle'
+        ? `${photos.length} 张照片以随机顺序重新排列。再次点击 SHUFFLE 可以重新洗牌。`
+        : `按拍摄时间排列的 ${photos.length} 个瞬间。照片保持原始比例，EXIF 作为独立信息带保留。`);
+    };
+    orderButtons.forEach(btn => btn.addEventListener('click', () => {
+      const nextMode = btn.dataset.projectOrder === 'shuffle' ? 'shuffle' : 'time';
+      const reroll = nextMode === 'shuffle' && orderMode === 'shuffle';
+      orderMode = nextMode;
+      localStorage.setItem('project-order-mode', orderMode);
+      renderProject(reroll);
+    }));
+    renderProject();
 
     const all = await photosSafe();
     const publicAll = all ? (A?.filterVisiblePhotos ? A.filterVisiblePhotos(all, siteSettings) : all) : [];
@@ -245,12 +306,22 @@
     const projects = [...new Set(publicPhotos.map(p=>p.project || '未分类'))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
     filter.insertAdjacentHTML('beforeend', projects.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join(''));
 
+    const orderButtons = $$('[data-archive-order]');
+    let orderMode = localStorage.getItem('archive-order-mode') === 'shuffle' ? 'shuffle' : 'time';
     const render = () => {
       const visible = filter.value ? publicPhotos.filter(p=>(p.project||'未分类')===filter.value) : publicPhotos;
+      const ordered = orderMode === 'shuffle' ? shuffled(visible) : visible;
       count.textContent = `${visible.length} 张照片`;
-      grid.innerHTML = visible.map(archiveCard).join('');
+      grid.innerHTML = ordered.map(archiveCard).join('');
+      orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.archiveOrder === orderMode));
       UI()?.activateReveals(grid);
     };
+    orderButtons.forEach(btn => btn.addEventListener('click', () => {
+      const nextMode = btn.dataset.archiveOrder === 'shuffle' ? 'shuffle' : 'time';
+      orderMode = nextMode;
+      localStorage.setItem('archive-order-mode', orderMode);
+      render();
+    }));
     filter.addEventListener('change',render); render();
   }
 
