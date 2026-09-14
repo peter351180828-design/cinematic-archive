@@ -1,34 +1,48 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=4"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
   <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-site-name>咸鱼桑</span><small>摄影档案</small></a><nav class="site-nav"><a href="index.html" data-transition>作品</a><a href="archive.html" data-transition>档案</a><a href="stats.html" data-transition>数据</a><a href="about.html" data-transition>关于</a></nav><div class="header-side"><span id="auth-status">私人后台</span><button id="logout-button" type="button" hidden>退出</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
   <div class="mobile-menu" data-mobile-menu><nav><a href="index.html">作品</a><a href="archive.html">档案</a><a href="stats.html">数据</a><a href="about.html">关于</a></nav></div>
-  <main><section class="admin-hero"><div class="eyebrow">私人后台</div><h1><span class="accent-char">私</span>人后台</h1></section><div class="admin-shell">
+  <main><section class="admin-hero"><div class="eyebrow">PRIVATE ARCHIVE / CONTROL ROOM</div><h1><span class="accent-char">管</span>理后台</h1></section><div class="admin-shell">
     <section id="auth-gate" class="login-panel">
       <h2>登录后管理摄影档案</h2>
       <form id="login-form" class="admin-form"><label>邮箱<input id="login-email" type="email" autocomplete="username" required></label><label>密码<input id="login-password" type="password" autocomplete="current-password" required></label><button class="admin-button" type="submit">登录</button></form>
     </section>
 
     <section id="admin-app" hidden>
-      <div class="admin-status-bar"><span>已登录：<b id="signed-in-email"></b></span><span>EXIF 在浏览器本地读取；网页 JPEG 不保存 GPS。</span></div>
-      <form id="upload-form" class="admin-panel">
-        <div class="admin-form">
-          <label>上传到摄影集
-            <select id="upload-project-select"></select>
-          </label>
-          <label id="new-project-field" hidden>新摄影集名称<input id="upload-project-new" type="text" placeholder="例如：ChinaJoy 2026"></label>
-          <p id="project-upload-hint" class="admin-message">正在读取已有摄影集…</p>
-          <label>这一批的备注<textarea id="upload-note" placeholder="可选：天气、同行的人、当天的感受……"></textarea></label>
-          <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
-          <button class="admin-button" type="submit">上传并读取 EXIF</button>
-          <p id="selected-files" class="admin-message">尚未选择照片</p><p id="upload-status" class="admin-message">等待上传</p>
+      <div class="admin-status-bar"><span>已登录：<b id="signed-in-email"></b></span><span>原图 EXIF 在浏览器读取；网页 JPEG 不保存 GPS。</span></div>
+
+      <section class="admin-section-block">
+        <div class="admin-section-title"><div><span class="eyebrow">UPLOAD</span><h2>追加照片</h2></div><p>选择已有摄影集直接追加；只有明确选择“新建摄影集”时才创建新系列。</p></div>
+        <form id="upload-form" class="admin-panel admin-upload-panel">
+          <div class="admin-form">
+            <label>上传到摄影集<select id="upload-project-select"></select></label>
+            <label id="new-project-field" hidden>新摄影集名称<input id="upload-project-new" type="text" placeholder="例如：ChinaJoy 2026"></label>
+            <p id="project-upload-hint" class="admin-message">正在读取已有摄影集…</p>
+            <label>这一批的备注<textarea id="upload-note" placeholder="可选：天气、同行的人、当天的感受……"></textarea></label>
+            <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+            <button class="admin-button" type="submit">上传并读取 EXIF</button>
+            <p id="selected-files" class="admin-message">尚未选择照片</p><p id="upload-status" class="admin-message">等待上传</p>
+          </div>
+          <label id="drop-zone" class="admin-drop" for="photo-input"><div><strong>选择或拖入照片</strong><p>JPEG / PNG / WebP · 自动生成最长边约 2560px 的网页 JPEG</p></div></label>
+        </form>
+      </section>
+
+      <section class="admin-library admin-section-block">
+        <div class="admin-section-title admin-library-title"><div><span class="eyebrow">LIBRARY</span><h2>照片管理</h2></div><p>先选择摄影集，再直接点击缩略图右上角的圆形勾选框进行多选。</p></div>
+        <div class="admin-library-controls">
+          <label>摄影集<select id="admin-library-project"></select></label>
+          <span id="admin-photo-count" class="mono">读取中</span>
         </div>
-        <label id="drop-zone" class="admin-drop" for="photo-input"><div><strong>选择或拖入照片</strong><p>JPEG / PNG / WebP · 自动生成最长边约 2560px 的网页 JPEG</p></div></label>
-      </form>
-      <section class="admin-library"><div class="admin-library-head"><h2>照片库</h2><span id="admin-photo-count" class="mono">读取中</span></div><div id="admin-photo-list"></div></section>
+        <div class="admin-selection-toolbar" id="admin-selection-toolbar">
+          <div><strong id="admin-selected-count">已选 0 张</strong><span id="admin-visible-count">当前 0 张</span></div>
+          <div class="admin-selection-actions"><button type="button" class="admin-ghost-button" id="admin-select-all">全选当前摄影集</button><button type="button" class="admin-ghost-button" id="admin-clear-selection">取消选择</button><button type="button" class="admin-danger-button" id="admin-delete-selected" disabled>删除所选</button></div>
+        </div>
+        <div id="admin-photo-list" class="admin-photo-grid"></div>
+      </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=1"></script><script src="assets/js/site.js?v=1"></script><script src="assets/js/admin.js?v=1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=1"></script><script src="assets/js/site.js?v=4"></script><script src="assets/js/admin.js?v=4"></script>
 </body></html>

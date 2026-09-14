@@ -59,7 +59,7 @@
       requestAnimationFrame(loop);
     }; loop();
     document.addEventListener('pointerover', e => {
-      ring.classList.toggle('is-active', Boolean(e.target.closest('a,button,.project-visual,.archive-card')));
+      ring.classList.toggle('is-active', Boolean(e.target.closest('a,button,.project-visual,.archive-card,.home-project-card,.home-list-row,.admin-photo-card')));
     });
   }
 
@@ -97,6 +97,20 @@
     localStorage.setItem('creative-mode', on ? '1' : '0');
     creativeBtn.textContent = on ? '动效 ON' : '动效 OFF';
   });
+
+
+
+  // Home hero parallax, only while Creative mode is on.
+  const cinemaHero = $('.cinema-hero');
+  const cinemaHeroBg = $('.cinema-hero-bg');
+  cinemaHero?.addEventListener('pointermove', e => {
+    if (!document.body.classList.contains('creative-mode') || innerWidth < 981 || !cinemaHeroBg) return;
+    const r = cinemaHero.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width - .5) * 12;
+    const y = ((e.clientY - r.top) / r.height - .5) * 9;
+    cinemaHeroBg.style.translate = `${x}px ${y}px`;
+  });
+  cinemaHero?.addEventListener('pointerleave', () => { if (cinemaHeroBg) cinemaHeroBg.style.translate = ''; });
 
   // Timeline progress.
   const timeline = $('.timeline');

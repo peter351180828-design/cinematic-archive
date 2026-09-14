@@ -35,47 +35,92 @@
 
   async function initHome() {
     if (page !== 'home') return;
-    const stage = $('#projects-stage');
-    const rail = $('#filmstrip-rail');
-    if (!stage) return;
+    const slider = $('#home-project-slider');
+    const list = $('#home-project-list');
+    const count = $('#home-project-count');
+    const heroBg = $('#home-hero-bg');
+    const heroTitle = $('[data-home-title]');
+    const preview = $('#home-list-preview');
+    if (!slider || !list) return;
+
+    if (heroTitle) heroTitle.innerHTML = firstCharTitle(A?.config?.siteName || '咸鱼桑');
+
     if (!A?.configured) {
-      stage.innerHTML = `<section class="home-empty">${setupNotice()}</section>`;
+      slider.innerHTML = setupNotice();
       return;
     }
     const photos = await photosSafe();
     if (!photos) {
-      stage.innerHTML = `<section class="home-empty"><div><h2>读取失败</h2><p>请检查网络与 Supabase 配置。</p></div></section>`;
+      slider.innerHTML = '<div class="home-loading">读取失败，请检查网络与 Supabase 配置。</div>';
       return;
     }
     if (!photos.length) {
-      stage.innerHTML = `<section class="home-empty"><div><h2><span class="accent-char">还</span>没有照片</h2><p>进入管理后台上传第一批照片。摄影集会自动出现在这里。</p></div></section>`;
+      slider.innerHTML = '<div class="home-loading">还没有照片。进入管理后台上传第一批照片。</div>';
       return;
     }
+
     const projects = A.groupProjects(photos);
-    stage.innerHTML = projects.map((project, i) => `
-      <a class="project-scene reveal" id="project-${i}" data-transition href="project.html?collection=${encodeURIComponent(project.name)}">
-        <span class="project-number">${String(i+1).padStart(2,'0')} / ${String(projects.length).padStart(2,'0')}</span>
-        <div class="project-visual"><img loading="${i < 2 ? 'eager':'lazy'}" src="${esc(project.cover.url)}" alt="${esc(project.name)}"></div>
-        <div class="project-title-wrap">
-          <h2 class="project-title">${firstCharTitle(project.name)}</h2>
-          <div class="project-kicker"><span>${esc(project.year || '—')}</span><br><span>${project.count} 张照片</span></div>
-        </div>
+    if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
+    if (heroBg && projects[0]?.cover?.url) heroBg.style.backgroundImage = `linear-gradient(90deg,rgba(4,8,8,.34),rgba(4,8,8,.1)),url("${projects[0].cover.url.replace(/"/g,'%22')}")`;
+
+    slider.innerHTML = projects.map((project, i) => `
+      <article class="home-project-card reveal">
+        <a class="home-project-link" data-transition href="project.html?collection=${encodeURIComponent(project.name)}">
+          <span class="home-project-num mono">${String(i+1).padStart(2,'0')} / ${esc(project.year || '—')}</span>
+          <div class="home-project-frame"><img loading="${i < 2 ? 'eager':'lazy'}" src="${esc(project.cover.url)}" alt="${esc(project.name)}"></div>
+          <h3 class="home-project-title">${firstCharTitle(project.name)}</h3>
+          <div class="home-project-meta"><span>${project.count} 张照片</span><span>${esc(project.year || '日期未知')}</span></div>
+        </a>
+      </article>`).join('');
+
+    list.innerHTML = projects.map((project, i) => `
+      <a class="home-list-row" data-transition href="project.html?collection=${encodeURIComponent(project.name)}" data-preview="${esc(project.cover.url)}">
+        <span class="mono">${String(i+1).padStart(2,'0')}</span>
+        <span class="home-list-name">${firstCharTitle(project.name)}</span>
+        <span>${project.count} 张</span>
+        <span>${esc(project.year || '—')}</span>
       </a>`).join('');
 
-    if (rail) {
-      rail.innerHTML = projects.slice(0,12).map((p,i)=>`<button class="filmstrip-thumb ${i===0?'is-active':''}" type="button" data-target="project-${i}" aria-label="前往 ${esc(p.name)}"><img src="${esc(p.cover.url)}" alt=""></button>`).join('');
-      rail.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => document.getElementById(btn.dataset.target)?.scrollIntoView({behavior:'smooth'})));
-      const scenes = $$('.project-scene');
-      if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver(entries => entries.forEach(entry => {
-          if (!entry.isIntersecting) return;
-          const idx = Number(entry.target.id.replace('project-',''));
-          rail.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('is-active',i===idx));
-        }), {threshold:.55});
-        scenes.forEach(s=>io.observe(s));
-      }
+    const buttons = $$('[data-home-view]');
+    const setView = mode => {
+      const isSlider = mode === 'slider';
+      slider.hidden = !isSlider;
+      list.hidden = isSlider;
+      $('.home-slider-help')?.toggleAttribute('hidden', !isSlider);
+      buttons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.homeView === mode));
+      localStorage.setItem('home-project-view', mode);
+    };
+    buttons.forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.homeView)));
+    setView(localStorage.getItem('home-project-view') === 'list' ? 'list' : 'slider');
+
+    // Horizontal wheel + drag interaction, mirroring the first cinematic prototype.
+    slider.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      slider.scrollLeft += e.deltaY * .9;
+    }, {passive:false});
+    let dragging = false, dragMoved = false, startX = 0, startScroll = 0;
+    slider.addEventListener('pointerdown', e => {
+      dragging = true; dragMoved = false; startX = e.clientX; startScroll = slider.scrollLeft;
+      slider.setPointerCapture?.(e.pointerId);
+    });
+    slider.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      if (Math.abs(e.clientX - startX) > 6) dragMoved = true;
+      slider.scrollLeft = startScroll - (e.clientX - startX);
+    });
+    slider.addEventListener('click', e => { if (dragMoved) { e.preventDefault(); e.stopPropagation(); dragMoved = false; } }, true);
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, () => dragging = false));
+
+    if (preview) {
+      const img = preview.querySelector('img');
+      $$('.home-list-row', list).forEach(row => {
+        row.addEventListener('pointerenter', () => { if (img) img.src = row.dataset.preview; preview.classList.add('is-visible'); });
+        row.addEventListener('pointermove', e => { preview.style.left = `${e.clientX}px`; preview.style.top = `${e.clientY}px`; });
+        row.addEventListener('pointerleave', () => preview.classList.remove('is-visible'));
+      });
     }
-    UI()?.activateReveals(stage);
+    UI()?.activateReveals(slider);
   }
 
   function exifPairs(photo) {
@@ -88,14 +133,15 @@
   }
   function timelineItem(photo, index) {
     const pairs = exifPairs(photo);
-    return `<article class="timeline-item reveal">
-      <div class="timeline-media"><img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></div>
-      <span class="timeline-node" aria-hidden="true"></span>
-      <aside class="timeline-exif">
-        <span class="exif-index">${String(index+1).padStart(2,'0')}</span>
-        <div class="exif-list">${pairs.length ? pairs.map(([l,v])=>`<div class="exif-pair"><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div class="exif-pair"><small>EXIF</small><b>无可读信息</b></div>'}</div>
+    const w = Number(photo.exif?.width || 0), h = Number(photo.exif?.height || 0);
+    const shape = w && h ? (h > w * 1.12 ? 'is-portrait' : w > h * 1.28 ? 'is-wide' : 'is-standard') : 'is-standard';
+    return `<article class="project-flow-item ${shape} reveal">
+      <div class="project-flow-media"><img loading="lazy" src="${esc(photo.url)}" alt="${esc(photo.project || '摄影作品')}"></div>
+      <div class="project-flow-caption">
+        <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
+        <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
         ${photo.note ? `<p class="photo-note">${esc(photo.note)}</p>` : ''}
-      </aside>
+      </div>
     </article>`;
   }
   async function initProject() {
@@ -116,8 +162,8 @@
     $$('[data-project-year]').forEach(el => el.textContent = year);
     $$('[data-project-count]').forEach(el => el.textContent = `${photos.length} 张`);
     $$('[data-project-camera]').forEach(el => el.textContent = A.buildStats(photos).primaryCamera || '多设备');
-    $$('[data-project-description]').forEach(el => el.textContent = `按拍摄时间排列的 ${photos.length} 个瞬间。完整画幅展示，EXIF 信息与照片并列保留。`);
-    timeline.innerHTML = `<div class="timeline-line" aria-hidden="true"></div>${photos.map(timelineItem).join('')}`;
+    $$('[data-project-description]').forEach(el => el.textContent = `按拍摄时间排列的 ${photos.length} 个瞬间。照片保持原始比例，EXIF 作为独立信息带保留。`);
+    timeline.innerHTML = photos.map(timelineItem).join('');
     UI()?.activateReveals(timeline);
 
     const all = await photosSafe();
