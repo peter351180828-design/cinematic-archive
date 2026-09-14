@@ -18,6 +18,7 @@
   const selectAllBtn = $('#admin-select-all'), clearBtn = $('#admin-clear-selection'), deleteBtn = $('#admin-delete-selected');
   const identityForm = $('#identity-form'), englishNameInput = $('#english-display-name'), identityStatus = $('#identity-status');
   const visibilityList = $('#collection-visibility-list'), visibilityStatus = $('#collection-visibility-status'), visibilitySummary = $('#collection-visibility-summary');
+  const collectionIntroForm = $('#collection-intro-form'), collectionIntroProject = $('#collection-intro-project'), collectionIntroText = $('#collection-intro-text'), collectionIntroStatus = $('#collection-intro-status');
   const storageUsed = $('#storage-used'), storageOf = $('#storage-of'), storagePercent = $('#storage-percent');
   const storageRemaining = $('#storage-remaining'), storageAverage = $('#storage-average'), storageEstimate = $('#storage-estimate');
   const storageMeter = $('.storage-meter'), storageMeterBar = $('#storage-meter-bar'), storagePhotoSummary = $('#storage-photo-summary');
@@ -29,7 +30,7 @@
   let knownProjects = [];
   let libraryPhotos = [];
   let visiblePhotos = [];
-  let siteSettings = { hiddenProjects: [], storageQuotaGB: 1 };
+  let siteSettings = { hiddenProjects: [], storageQuotaGB: 1, collectionDescriptions: {} };
   const selectedIds = new Set();
 
   function setStatus(message, isError=false) {
@@ -101,11 +102,12 @@
     if (!englishNameInput || !A?.loadSiteSettings) return;
     try {
       const settings = await A.loadSiteSettings(true);
-      siteSettings = { ...settings, hiddenProjects:Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : [], storageQuotaGB:Number(settings.storageQuotaGB) > 0 ? Number(settings.storageQuotaGB) : 1 };
+      siteSettings = { ...settings, hiddenProjects:Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : [], collectionDescriptions:settings.collectionDescriptions && typeof settings.collectionDescriptions === 'object' && !Array.isArray(settings.collectionDescriptions) ? settings.collectionDescriptions : {}, storageQuotaGB:Number(settings.storageQuotaGB) > 0 ? Number(settings.storageQuotaGB) : 1 };
       englishNameInput.value = settings.englishName || A.config.englishName || '';
       if (identityStatus) identityStatus.textContent = '当前名称已同步';
       syncStorageQuotaForm();
       renderCollectionVisibility();
+      syncCollectionIntroChooser();
       renderStorageUsage();
     } catch (error) {
       if (identityStatus) identityStatus.textContent = `读取名称失败：${error.message || error}`;
@@ -238,6 +240,54 @@
     const input = e.target.closest('[data-collection-visibility]');
     if (!input) return;
     saveCollectionVisibility(input.dataset.project || '', input.checked, input);
+  });
+
+  function collectionDescriptions() {
+    return siteSettings.collectionDescriptions && typeof siteSettings.collectionDescriptions === 'object' && !Array.isArray(siteSettings.collectionDescriptions)
+      ? siteSettings.collectionDescriptions : {};
+  }
+
+  function syncCollectionIntroChooser(preferredName = '') {
+    if (!collectionIntroProject) return;
+    const previous = preferredName || collectionIntroProject.value || knownProjects[0]?.name || '';
+    collectionIntroProject.innerHTML = knownProjects.length
+      ? knownProjects.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} · ${p.count} PHOTOS</option>`).join('')
+      : '<option value="">还没有摄影集</option>';
+    collectionIntroProject.value = knownProjects.some(p => p.name === previous) ? previous : (knownProjects[0]?.name || '');
+    syncCollectionIntroText();
+  }
+
+  function syncCollectionIntroText() {
+    if (!collectionIntroText) return;
+    const project = collectionIntroProject?.value || '';
+    collectionIntroText.value = project ? String(collectionDescriptions()[project] || '') : '';
+    collectionIntroText.disabled = !project;
+    if (collectionIntroStatus) collectionIntroStatus.textContent = project
+      ? (collectionIntroText.value ? '已载入当前简介' : '这个摄影集还没有简介')
+      : '还没有可编辑的摄影集';
+  }
+
+  collectionIntroProject?.addEventListener('change', syncCollectionIntroText);
+
+  collectionIntroForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentUser || !A?.saveSiteSettings) return;
+    const project = collectionIntroProject?.value || '';
+    if (!project) return;
+    const button = collectionIntroForm.querySelector('button[type="submit"]');
+    const descriptions = { ...collectionDescriptions() };
+    const value = String(collectionIntroText?.value || '').trim();
+    if (value) descriptions[project] = value; else delete descriptions[project];
+    button.disabled = true;
+    if (collectionIntroStatus) collectionIntroStatus.textContent = '正在保存简介…';
+    try {
+      siteSettings = await A.saveSiteSettings({ collectionDescriptions:descriptions });
+      if (!siteSettings.collectionDescriptions || typeof siteSettings.collectionDescriptions !== 'object') siteSettings.collectionDescriptions = descriptions;
+      if (collectionIntroStatus) collectionIntroStatus.textContent = value ? `已保存 · 「${project}」简介已更新` : `已清空 · 「${project}」将显示默认提示`;
+    } catch (error) {
+      console.error(error);
+      if (collectionIntroStatus) collectionIntroStatus.textContent = `保存失败：${error.message || error}`;
+    } finally { button.disabled = false; }
   });
 
   identityForm?.addEventListener('submit', async e => {
@@ -406,8 +456,10 @@
       knownProjects = A.groupProjects(libraryPhotos);
       syncProjectChooser(preferredProject);
       syncLibraryChooser(preferredProject);
+      syncCollectionIntroChooser(preferredProject);
       $('#admin-photo-count').textContent = `${libraryPhotos.length} 张 · ${knownProjects.length} 个摄影集`;
       renderCollectionVisibility();
+      syncCollectionIntroChooser();
       renderStorageUsage();
       renderLibrary();
     } catch (error) { photoList.innerHTML = `<p class="admin-message">读取失败：${escapeHtml(error.message)}</p>`; }
@@ -429,7 +481,7 @@
       const photo = libraryPhotos.find(p => p.id === id); if (!photo) return;
       const title = prompt('照片标题（仅后台使用）', photo.title); if (title == null) return;
       const project = prompt('摄影集名称', photo.project); if (project == null) return;
-      const note = prompt('个人备注（可留空）', photo.note || ''); if (note == null) return;
+      const note = prompt('私人备注（仅后台保存，不在前台展示）', photo.note || ''); if (note == null) return;
       const normalizedProject = canonicalExistingProject(project)?.name || normalizeProjectName(project) || '未分类';
       const { error } = await A.client.from(A.table).update({ title:title.trim() || photo.title, project:normalizedProject, note:note.trim() }).eq('id', id);
       if (error) alert(`修改失败：${error.message}`); else await loadLibrary(normalizedProject);

@@ -146,7 +146,20 @@
       return;
     }
 
-    const projects = A.groupProjects(publicPhotos);
+    // 首页摄影集按实际拍摄时间排序：每个摄影集取其中最新一张照片的时间，
+    // 最新摄影集排在最前；同一时间则按摄影集名称稳定排序。
+    // 这里使用 EXIF dateTaken，缺失时才回退到 uploadedAt，避免“后上传旧照片”打乱首页年代顺序。
+    const latestTimeByProject = new Map();
+    publicPhotos.forEach(photo => {
+      const name = photo.project || '未分类';
+      const time = A.photoTime ? A.photoTime(photo) : new Date(photo.exif?.dateTaken || photo.uploadedAt || 0).getTime();
+      const current = latestTimeByProject.get(name) || 0;
+      if (time > current) latestTimeByProject.set(name, time);
+    });
+    const projects = A.groupProjects(publicPhotos).sort((a, b) => {
+      const diff = (latestTimeByProject.get(b.name) || 0) - (latestTimeByProject.get(a.name) || 0);
+      return diff || String(a.name).localeCompare(String(b.name), 'zh-CN');
+    });
     if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
     if (heroBg) mountAdaptiveHeroCarousel(heroBg, publicPhotos);
 
@@ -227,7 +240,6 @@
       <div class="project-flow-caption">
         <span class="project-flow-index mono">${String(index+1).padStart(2,'0')}</span>
         <div class="project-flow-exif">${pairs.length ? pairs.map(([l,v])=>`<div><small>${esc(l)}</small><b>${esc(v)}</b></div>`).join('') : '<div><small>EXIF</small><b>无可读信息</b></div>'}</div>
-        ${photo.note ? `<p class="photo-note">${esc(photo.note)}</p>` : ''}
       </div>
     </article>`;
   }
@@ -256,6 +268,9 @@
     $$('[data-project-count]').forEach(el => el.textContent = `${photos.length} 张`);
     $$('[data-project-camera]').forEach(el => el.textContent = A.buildStats(photos).primaryCamera || '多设备');
 
+    const intro = String(siteSettings?.collectionDescriptions?.[collection] || '').trim();
+    $$('[data-project-description]').forEach(el => el.textContent = intro || '这个摄影集还没有简介。');
+
     const orderButtons = $$('[data-project-order]');
     let orderMode = localStorage.getItem('project-order-mode') === 'shuffle' ? 'shuffle' : 'time';
     const renderProject = (reshuffle = false) => {
@@ -263,9 +278,6 @@
       timeline.innerHTML = ordered.map(timelineItem).join('');
       UI()?.activateReveals(timeline);
       orderButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.projectOrder === orderMode));
-      $$('[data-project-description]').forEach(el => el.textContent = orderMode === 'shuffle'
-        ? `${photos.length} 张照片以随机顺序重新排列。再次点击 SHUFFLE 可以重新洗牌。`
-        : `按拍摄时间排列的 ${photos.length} 个瞬间。照片保持原始比例，EXIF 作为独立信息带保留。`);
     };
     orderButtons.forEach(btn => btn.addEventListener('click', () => {
       const nextMode = btn.dataset.projectOrder === 'shuffle' ? 'shuffle' : 'time';

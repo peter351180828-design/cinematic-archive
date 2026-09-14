@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=10"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=11"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
   <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span id="auth-status">PRIVATE</span><button id="logout-button" type="button" hidden>LOG OUT</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
@@ -62,6 +62,15 @@
         <p id="collection-visibility-status" class="admin-message">所有摄影集默认 VISIBLE</p>
       </section>
 
+      <section class="admin-section-block admin-collection-intro-block">
+        <div class="admin-section-title"><div><span class="eyebrow">COLLECTION INTRO</span><h2>摄影集简介</h2></div><p>这里的文字会显示在摄影集详情页顶部，用来替代原来的功能性说明。每个摄影集可以保存一段独立简介。</p></div>
+        <form id="collection-intro-form" class="collection-intro-form">
+          <label>摄影集<select id="collection-intro-project"></select></label>
+          <label class="collection-intro-copy">简介<textarea id="collection-intro-text" maxlength="420" placeholder="例如：这组照片记录了冬季丝绸之路沿线的风、雪、停靠和短暂相遇。"></textarea></label>
+          <div class="collection-intro-actions"><button class="admin-button" type="submit">SAVE INTRO</button><span id="collection-intro-status" class="admin-message">选择摄影集后编辑简介</span></div>
+        </form>
+      </section>
+
       <section class="admin-section-block">
         <div class="admin-section-title"><div><span class="eyebrow">UPLOAD</span><h2>追加照片</h2></div><p>选择已有摄影集直接追加；只有明确选择“新建摄影集”时才创建新系列。</p></div>
         <form id="upload-form" class="admin-panel admin-upload-panel">
@@ -69,7 +78,7 @@
             <label>上传到摄影集<select id="upload-project-select"></select></label>
             <label id="new-project-field" hidden>新摄影集名称<input id="upload-project-new" type="text" placeholder="例如：ChinaJoy 2026"></label>
             <p id="project-upload-hint" class="admin-message">正在读取已有摄影集…</p>
-            <label>这一批的备注<textarea id="upload-note" placeholder="可选：天气、同行的人、当天的感受……"></textarea></label>
+            <label>私人备注（仅后台保存）<textarea id="upload-note" placeholder="可选：天气、同行的人、当天的感受……不会显示在公开页面"></textarea></label>
             <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
             <button class="admin-button" type="submit">上传并读取 EXIF</button>
             <p id="selected-files" class="admin-message">尚未选择照片</p><p id="upload-status" class="admin-message">等待上传</p>
@@ -92,5 +101,5 @@
       </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=10"></script><script src="assets/js/site.js?v=10"></script><script src="assets/js/admin.js?v=10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=11"></script><script src="assets/js/site.js?v=10"></script><script src="assets/js/admin.js?v=11"></script>
 </body></html>

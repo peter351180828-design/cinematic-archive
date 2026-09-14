@@ -192,7 +192,7 @@
   const SETTINGS_PATH = 'site/site-settings.json';
   let settingsCache = null;
   async function loadSiteSettings(force = false) {
-    const fallback = { englishName: config.englishName || config.siteName || 'PHOTO ARCHIVE', hiddenProjects: [] };
+    const fallback = { englishName: config.englishName || config.siteName || 'PHOTO ARCHIVE', hiddenProjects: [], collectionDescriptions: {} };
     if (!client) return fallback;
     if (settingsCache && !force) return { ...fallback, ...settingsCache };
     try {
@@ -207,6 +207,8 @@
       settingsCache = data && typeof data === 'object' ? data : {};
       if (!Array.isArray(settingsCache.hiddenProjects)) settingsCache.hiddenProjects = [];
       settingsCache.hiddenProjects = [...new Set(settingsCache.hiddenProjects.map(v => String(v || '').trim()).filter(Boolean))];
+      if (!settingsCache.collectionDescriptions || typeof settingsCache.collectionDescriptions !== 'object' || Array.isArray(settingsCache.collectionDescriptions)) settingsCache.collectionDescriptions = {};
+      settingsCache.collectionDescriptions = Object.fromEntries(Object.entries(settingsCache.collectionDescriptions).map(([k,v]) => [String(k || '').trim(), String(v || '').trim()]).filter(([k]) => k));
       return { ...fallback, ...settingsCache };
     } catch (error) {
       console.warn('Site settings fallback:', error);
