@@ -19,6 +19,7 @@
   const identityForm = $('#identity-form'), englishNameInput = $('#english-display-name'), identityStatus = $('#identity-status');
   const visibilityList = $('#collection-visibility-list'), visibilityStatus = $('#collection-visibility-status'), visibilitySummary = $('#collection-visibility-summary');
   const collectionIntroForm = $('#collection-intro-form'), collectionIntroProject = $('#collection-intro-project'), collectionIntroText = $('#collection-intro-text'), collectionIntroStatus = $('#collection-intro-status');
+  const collectionRenameForm = $('#collection-rename-form'), collectionRenameProject = $('#collection-rename-project'), collectionRenameNew = $('#collection-rename-new'), collectionRenameStatus = $('#collection-rename-status');
   const storageUsed = $('#storage-used'), storageOf = $('#storage-of'), storagePercent = $('#storage-percent');
   const storageRemaining = $('#storage-remaining'), storageAverage = $('#storage-average'), storageEstimate = $('#storage-estimate');
   const storageMeter = $('.storage-meter'), storageMeterBar = $('#storage-meter-bar'), storagePhotoSummary = $('#storage-photo-summary');
@@ -108,6 +109,7 @@
       syncStorageQuotaForm();
       renderCollectionVisibility();
       syncCollectionIntroChooser();
+      syncCollectionRenameChooser();
       renderStorageUsage();
     } catch (error) {
       if (identityStatus) identityStatus.textContent = `读取名称失败：${error.message || error}`;
@@ -240,6 +242,105 @@
     const input = e.target.closest('[data-collection-visibility]');
     if (!input) return;
     saveCollectionVisibility(input.dataset.project || '', input.checked, input);
+  });
+
+  function syncCollectionRenameChooser(preferredName = '') {
+    if (!collectionRenameProject) return;
+    const previous = preferredName || collectionRenameProject.value || knownProjects[0]?.name || '';
+    collectionRenameProject.innerHTML = knownProjects.length
+      ? knownProjects.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} · ${p.count} PHOTOS</option>`).join('')
+      : '<option value="">还没有摄影集</option>';
+    collectionRenameProject.value = knownProjects.some(p => p.name === previous) ? previous : (knownProjects[0]?.name || '');
+    if (collectionRenameNew) {
+      collectionRenameNew.disabled = !collectionRenameProject.value;
+      collectionRenameNew.value = '';
+      collectionRenameNew.placeholder = collectionRenameProject.value ? `当前：${collectionRenameProject.value}` : '还没有可修改的摄影集';
+    }
+    if (collectionRenameStatus) collectionRenameStatus.textContent = collectionRenameProject.value ? '修改后会同步更新整个摄影集' : '还没有可修改的摄影集';
+  }
+
+  collectionRenameProject?.addEventListener('change', () => {
+    if (collectionRenameNew) {
+      collectionRenameNew.value = '';
+      collectionRenameNew.placeholder = collectionRenameProject.value ? `当前：${collectionRenameProject.value}` : '输入新的摄影集名称';
+      collectionRenameNew.focus();
+    }
+    if (collectionRenameStatus) collectionRenameStatus.textContent = '修改后会同步更新整个摄影集';
+  });
+
+  async function updateProjectRows(ids, projectName) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await A.client.from(A.table).update({ project:projectName }).in('id', ids.slice(i, i + 100));
+      if (error) throw error;
+    }
+  }
+
+  collectionRenameForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentUser || !A?.client || !A?.saveSiteSettings) return;
+    const oldName = normalizeProjectName(collectionRenameProject?.value);
+    const newName = normalizeProjectName(collectionRenameNew?.value);
+    if (!oldName) return;
+    if (!newName) {
+      if (collectionRenameStatus) collectionRenameStatus.textContent = '请输入新的摄影集名称。';
+      return;
+    }
+    if (oldName.localeCompare(newName, 'zh-CN', { sensitivity:'base' }) === 0) {
+      if (collectionRenameStatus) collectionRenameStatus.textContent = '新名称与当前名称相同，无需修改。';
+      return;
+    }
+    const conflict = knownProjects.find(p => p.name !== oldName && p.name.localeCompare(newName, 'zh-CN', { sensitivity:'base' }) === 0);
+    if (conflict) {
+      if (collectionRenameStatus) collectionRenameStatus.textContent = `「${conflict.name}」已经存在。为避免误合并，请换一个名称。`;
+      return;
+    }
+    const affected = libraryPhotos.filter(p => p.project === oldName);
+    if (!affected.length) {
+      if (collectionRenameStatus) collectionRenameStatus.textContent = '这个摄影集没有可修改的照片。';
+      return;
+    }
+    if (!confirm(`把摄影集「${oldName}」改名为「${newName}」吗？\n\n将同步修改 ${affected.length} 张照片的摄影集名称；照片文件与 EXIF 不会变化。`)) return;
+
+    const button = collectionRenameForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    if (collectionRenameProject) collectionRenameProject.disabled = true;
+    if (collectionRenameNew) collectionRenameNew.disabled = true;
+    if (collectionRenameStatus) collectionRenameStatus.textContent = `正在修改 ${affected.length} 张照片…`;
+
+    const ids = affected.map(p => p.id);
+    const hiddenBefore = Array.isArray(siteSettings.hiddenProjects) ? siteSettings.hiddenProjects : [];
+    const descriptionsBefore = { ...collectionDescriptions() };
+    const hiddenProjects = [...new Set(hiddenBefore.map(name => name === oldName ? newName : name))];
+    const collectionDescriptionsNext = { ...descriptionsBefore };
+    if (Object.prototype.hasOwnProperty.call(collectionDescriptionsNext, oldName)) {
+      collectionDescriptionsNext[newName] = collectionDescriptionsNext[oldName];
+      delete collectionDescriptionsNext[oldName];
+    }
+
+    try {
+      await updateProjectRows(ids, newName);
+      try {
+        siteSettings = await A.saveSiteSettings({ hiddenProjects, collectionDescriptions:collectionDescriptionsNext });
+      } catch (settingsError) {
+        // Keep the archive consistent if site-settings cannot be migrated.
+        try { await updateProjectRows(ids, oldName); } catch (rollbackError) { console.error('Rename rollback failed:', rollbackError); }
+        throw new Error(`网站设置同步失败，已尝试恢复原名称：${settingsError.message || settingsError}`);
+      }
+      selectedIds.clear();
+      await loadLibrary(newName);
+      if (libraryProject) libraryProject.value = newName;
+      renderLibrary();
+      syncCollectionRenameChooser(newName);
+      if (collectionRenameStatus) collectionRenameStatus.textContent = `已完成 · 「${oldName}」→「${newName}」 · ${affected.length} 张照片`;
+      setStatus(`摄影集已改名：${newName}`);
+    } catch (error) {
+      console.error(error);
+      if (collectionRenameStatus) collectionRenameStatus.textContent = `修改失败：${error.message || error}`;
+    } finally {
+      button.disabled = false;
+      if (collectionRenameProject) collectionRenameProject.disabled = false;
+      if (collectionRenameNew) collectionRenameNew.disabled = !collectionRenameProject?.value;
+    }
   });
 
   function collectionDescriptions() {
@@ -457,6 +558,7 @@
       syncProjectChooser(preferredProject);
       syncLibraryChooser(preferredProject);
       syncCollectionIntroChooser(preferredProject);
+      syncCollectionRenameChooser(preferredProject);
       $('#admin-photo-count').textContent = `${libraryPhotos.length} 张 · ${knownProjects.length} 个摄影集`;
       renderCollectionVisibility();
       syncCollectionIntroChooser();

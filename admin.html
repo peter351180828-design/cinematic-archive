@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=11"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=12"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
   <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span id="auth-status">PRIVATE</span><button id="logout-button" type="button" hidden>LOG OUT</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
@@ -62,6 +62,16 @@
         <p id="collection-visibility-status" class="admin-message">所有摄影集默认 VISIBLE</p>
       </section>
 
+
+      <section class="admin-section-block admin-rename-block">
+        <div class="admin-section-title"><div><span class="eyebrow">COLLECTION NAME</span><h2>修改摄影集名称</h2></div><p>一次修改整个摄影集的名称。照片、EXIF、展示状态和摄影集简介都会保留；不会移动或重新上传图片。</p></div>
+        <form id="collection-rename-form" class="collection-rename-form">
+          <label>当前摄影集<select id="collection-rename-project"></select></label>
+          <label>新名称<input id="collection-rename-new" type="text" maxlength="120" placeholder="输入新的摄影集名称" autocomplete="off"></label>
+          <div class="collection-rename-actions"><button class="admin-button" type="submit">RENAME COLLECTION</button><span id="collection-rename-status" class="admin-message">选择摄影集并输入新名称</span></div>
+        </form>
+      </section>
+
       <section class="admin-section-block admin-collection-intro-block">
         <div class="admin-section-title"><div><span class="eyebrow">COLLECTION INTRO</span><h2>摄影集简介</h2></div><p>这里的文字会显示在摄影集详情页顶部，用来替代原来的功能性说明。每个摄影集可以保存一段独立简介。</p></div>
         <form id="collection-intro-form" class="collection-intro-form">
@@ -101,5 +111,5 @@
       </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=11"></script><script src="assets/js/site.js?v=10"></script><script src="assets/js/admin.js?v=11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=11"></script><script src="assets/js/site.js?v=10"></script><script src="assets/js/admin.js?v=12"></script>
 </body></html>
