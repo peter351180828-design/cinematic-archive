@@ -55,6 +55,82 @@
     const relative = (w / h) / (Math.max(1, innerWidth) / Math.max(1, innerHeight));
     return relative > .80 && relative < 1.24 ? 'cover' : 'contain';
   }
+  function projectCoverCandidate(photos, projectName, targetRatio = 4/3) {
+    const items = photos.filter(photo => (photo.project || '未分类') === projectName && photo?.url);
+    if (!items.length) return { photo:null, fit:'contain' };
+    const scored = items.map((photo, index) => {
+      const ratio = photoRatio(photo);
+      // 优先选择接近横向作品卡片比例的照片，降低竖幅人像被裁头的概率。
+      const ratioScore = ratio ? Math.abs(Math.log(ratio / targetRatio)) : 3;
+      const portraitPenalty = ratio && ratio < .92 ? .55 : 0;
+      const extremePenalty = ratio && (ratio < .66 || ratio > 2.05) ? .45 : 0;
+      const featuredBonus = photo.isFeatured ? -.18 : 0;
+      const recencyBonus = Math.max(-.08, -index * .00001);
+      return { photo, score:ratioScore + portraitPenalty + extremePenalty + featuredBonus + recencyBonus };
+    }).sort((a,b)=>a.score-b.score);
+    const best = scored[0]?.photo || items[0];
+    const ratio = photoRatio(best);
+    const relative = ratio ? ratio / targetRatio : 0;
+    const fit = ratio && relative > .82 && relative < 1.22 ? 'cover' : 'contain';
+    return { photo:best, fit };
+  }
+  function projectCardMarkup(project, i, photos, clone = false) {
+    const chosen = projectCoverCandidate(photos, project.name, 4/3);
+    const cover = chosen.photo || project.cover;
+    const loopAttrs = clone ? `${i === 0 ? ' data-loop-start="true"' : ''} data-loop-clone="true"` : '';
+    const safeUrl = esc(cover?.url || '');
+    return `
+      <article class="home-project-card reveal"${loopAttrs}>
+        <a class="home-project-link" data-transition href="project.html?collection=${encodeURIComponent(project.name)}">
+          <span class="home-project-num mono">${String(i+1).padStart(2,'0')} / ${esc(project.year || '—')}</span>
+          <div class="home-project-frame" data-fit="${chosen.fit}">
+            <img class="home-project-backdrop" loading="lazy" src="${safeUrl}" alt="" aria-hidden="true">
+            <img class="home-project-image" loading="${!clone && i < 2 ? 'eager':'lazy'}" src="${safeUrl}" alt="${esc(project.name)}">
+          </div>
+          <h3 class="home-project-title">${firstCharTitle(project.name)}</h3>
+          <div class="home-project-meta"><span>${project.count} 张照片</span><span>${esc(project.year || '日期未知')}</span></div>
+        </a>
+      </article>`;
+  }
+  function mountAutoFilmSlider(slider, projectCount) {
+    if (!slider || projectCount < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let paused = false, interacting = false, resumeTimer = null, raf = null, last = 0;
+    const speed = 18; // px / second: intentionally slow, like a moving film strip.
+    const loopPoint = () => slider.querySelector('[data-loop-start="true"]')?.offsetLeft || 0;
+    const normalize = () => {
+      const point = loopPoint();
+      if (!point) return;
+      if (slider.scrollLeft >= point) slider.scrollLeft -= point;
+    };
+    const tick = now => {
+      if (!last) last = now;
+      const dt = Math.min(40, now - last);
+      last = now;
+      if (!paused && !interacting && !document.hidden && innerWidth > 820) {
+        slider.scrollLeft += speed * dt / 1000;
+        normalize();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    const pause = () => { paused = true; };
+    const resume = () => { paused = false; last = performance.now(); };
+    const delayResume = (delay = 1100) => {
+      clearTimeout(resumeTimer);
+      interacting = true;
+      resumeTimer = setTimeout(() => { interacting = false; last = performance.now(); }, delay);
+    };
+    slider.addEventListener('pointerenter', pause);
+    slider.addEventListener('pointerleave', resume);
+    slider.addEventListener('focusin', pause);
+    slider.addEventListener('focusout', e => { if (!slider.contains(e.relatedTarget)) resume(); });
+    slider.addEventListener('wheel', () => delayResume(1400), { passive:true });
+    slider.addEventListener('pointerdown', () => { interacting = true; });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, () => delayResume(900)));
+    document.addEventListener('visibilitychange', () => { last = performance.now(); });
+    raf = requestAnimationFrame(tick);
+    addEventListener('pagehide', () => cancelAnimationFrame(raf), { once:true });
+  }
+
   function setHeroPhoto(container, photo, immediate = false) {
     if (!container || !photo?.url) return;
     const safe = esc(photo.url);
@@ -163,15 +239,10 @@
     if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
     if (heroBg) mountAdaptiveHeroCarousel(heroBg, publicPhotos);
 
-    slider.innerHTML = projects.map((project, i) => `
-      <article class="home-project-card reveal">
-        <a class="home-project-link" data-transition href="project.html?collection=${encodeURIComponent(project.name)}">
-          <span class="home-project-num mono">${String(i+1).padStart(2,'0')} / ${esc(project.year || '—')}</span>
-          <div class="home-project-frame"><img loading="${i < 2 ? 'eager':'lazy'}" src="${esc(project.cover.url)}" alt="${esc(project.name)}"></div>
-          <h3 class="home-project-title">${firstCharTitle(project.name)}</h3>
-          <div class="home-project-meta"><span>${project.count} 张照片</span><span>${esc(project.year || '日期未知')}</span></div>
-        </a>
-      </article>`).join('');
+    const filmMarkup = projects.map((project, i) => projectCardMarkup(project, i, publicPhotos, false)).join('');
+    // Duplicate one exact copy so the strip can loop seamlessly while still keeping every card clickable.
+    const filmCloneMarkup = projects.length > 1 ? projects.map((project, i) => projectCardMarkup(project, i, publicPhotos, true)).join('') : '';
+    slider.innerHTML = filmMarkup + filmCloneMarkup;
 
     list.innerHTML = projects.map((project, i) => `
       <a class="home-list-row" data-transition href="project.html?collection=${encodeURIComponent(project.name)}" data-preview="${esc(project.cover.url)}">
@@ -188,10 +259,10 @@
       list.hidden = isSlider;
       $('.home-slider-help')?.toggleAttribute('hidden', !isSlider);
       buttons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.homeView === mode));
-      localStorage.setItem('home-project-view', mode);
     };
     buttons.forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.homeView)));
-    setView(localStorage.getItem('home-project-view') === 'list' ? 'list' : 'slider');
+    // Every visit starts in the cinematic horizontal film-strip view. LIST remains an optional temporary view.
+    setView('slider');
 
     // Horizontal wheel + drag interaction, mirroring the first cinematic prototype.
     slider.addEventListener('wheel', e => {
@@ -220,6 +291,7 @@
         row.addEventListener('pointerleave', () => preview.classList.remove('is-visible'));
       });
     }
+    mountAutoFilmSlider(slider, projects.length);
     UI()?.activateReveals(slider);
   }
 
