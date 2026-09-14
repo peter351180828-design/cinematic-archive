@@ -4,8 +4,8 @@
  * 不要填写 Secret key。
  */
 window.PHOTO_ARCHIVE_CONFIG = {
-  supabaseUrl: 'PASTE_SUPABASE_PROJECT_URL_HERE',
-  supabaseKey: 'PASTE_SUPABASE_PUBLISHABLE_KEY_HERE',
+  supabaseUrl: 'https://kspatelbqtoyotxtadqn.supabase.co',
+  supabaseKey: 'Psb_publishable_yrHi4_DDO10AE-sfp2Sd5Q_7voGT7PaE',
   siteName: '咸鱼桑',
   siteSubtitle: '摄影档案',
   englishName: 'XIAN YU SANG',
