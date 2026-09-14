@@ -8,7 +8,7 @@ window.PHOTO_ARCHIVE_CONFIG = {
   supabaseKey: 'Psb_publishable_yrHi4_DDO10AE-sfp2Sd5Q_7voGT7PaE',
   siteName: '咸鱼桑',
   siteSubtitle: '摄影档案',
-  englishName: 'XIAN YU SANG',
+  englishName: 'Conzie',
   aboutIntro: '把照片留给未来的自己。这里不是商业橱窗，而是一份持续增长的个人视觉记忆。',
   location: '中国',
   storageBucket: 'photos',
