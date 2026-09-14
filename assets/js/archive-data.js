@@ -94,41 +94,81 @@
   }
   function mountAutoFilmSlider(slider, projectCount) {
     if (!slider || projectCount < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let paused = false, interacting = false, resumeTimer = null, raf = null, last = 0;
-    const speed = 18; // px / second: intentionally slow, like a moving film strip.
-    const loopPoint = () => slider.querySelector('[data-loop-start="true"]')?.offsetLeft || 0;
-    const normalize = () => {
-      const point = loopPoint();
-      if (!point) return;
-      if (slider.scrollLeft >= point) slider.scrollLeft -= point;
+
+    let cardHover = false;
+    let interacting = false;
+    let resumeTimer = null;
+    let raf = null;
+    let last = performance.now();
+    const speed = 30; // px / second: visible but still deliberately cinematic.
+
+    // The loop distance must be measured between the first original card and
+    // the first cloned card. Using clone.offsetLeft directly includes the
+    // slider's left padding and causes a visible jump at the wrap point.
+    const loopDistance = () => {
+      const first = slider.querySelector('.home-project-card:not([data-loop-clone="true"])');
+      const clone = slider.querySelector('[data-loop-start="true"]');
+      if (!first || !clone) return 0;
+      return Math.max(0, clone.offsetLeft - first.offsetLeft);
     };
+
+    const normalize = () => {
+      const distance = loopDistance();
+      if (!distance) return;
+      while (slider.scrollLeft >= distance) slider.scrollLeft -= distance;
+      while (slider.scrollLeft < 0) slider.scrollLeft += distance;
+    };
+
     const tick = now => {
-      if (!last) last = now;
-      const dt = Math.min(40, now - last);
+      const dt = Math.min(50, Math.max(0, now - last));
       last = now;
-      if (!paused && !interacting && !document.hidden && innerWidth > 820) {
+      const canMove = !cardHover && !interacting && !document.hidden && !slider.hidden && innerWidth > 820;
+      if (canMove && slider.scrollWidth > slider.clientWidth + 4) {
         slider.scrollLeft += speed * dt / 1000;
         normalize();
       }
       raf = requestAnimationFrame(tick);
     };
-    const pause = () => { paused = true; };
-    const resume = () => { paused = false; last = performance.now(); };
-    const delayResume = (delay = 1100) => {
+
+    const delayResume = (delay = 1200) => {
       clearTimeout(resumeTimer);
       interacting = true;
-      resumeTimer = setTimeout(() => { interacting = false; last = performance.now(); }, delay);
+      resumeTimer = setTimeout(() => {
+        interacting = false;
+        last = performance.now();
+      }, delay);
     };
-    slider.addEventListener('pointerenter', pause);
-    slider.addEventListener('pointerleave', resume);
-    slider.addEventListener('focusin', pause);
-    slider.addEventListener('focusout', e => { if (!slider.contains(e.relatedTarget)) resume(); });
-    slider.addEventListener('wheel', () => delayResume(1400), { passive:true });
-    slider.addEventListener('pointerdown', () => { interacting = true; });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type => slider.addEventListener(type, () => delayResume(900)));
+
+    // Pause only over an actual project card. The previous version paused as
+    // soon as the pointer entered the whole slider, which covers most of the
+    // viewport and made the automatic movement appear broken.
+    slider.querySelectorAll('.home-project-card').forEach(card => {
+      card.addEventListener('pointerenter', () => { cardHover = true; });
+      card.addEventListener('pointerleave', () => { cardHover = false; last = performance.now(); });
+      card.addEventListener('focusin', () => { cardHover = true; });
+      card.addEventListener('focusout', e => {
+        if (!card.contains(e.relatedTarget)) { cardHover = false; last = performance.now(); }
+      });
+    });
+
+    // Manual browsing temporarily takes priority; the film resumes by itself.
+    slider.addEventListener('wheel', () => delayResume(1600), { passive:true });
+    slider.addEventListener('pointerdown', () => { interacting = true; clearTimeout(resumeTimer); });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type =>
+      slider.addEventListener(type, () => delayResume(1200))
+    );
     document.addEventListener('visibilitychange', () => { last = performance.now(); });
-    raf = requestAnimationFrame(tick);
-    addEventListener('pagehide', () => cancelAnimationFrame(raf), { once:true });
+
+    // A short start delay lets eager cover images settle before motion begins.
+    setTimeout(() => {
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    }, 450);
+
+    addEventListener('pagehide', () => {
+      clearTimeout(resumeTimer);
+      if (raf) cancelAnimationFrame(raf);
+    }, { once:true });
   }
 
   function setHeroPhoto(container, photo, immediate = false) {
