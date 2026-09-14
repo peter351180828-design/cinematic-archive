@@ -479,3 +479,195 @@ body.creative-mode .cinema-hero-image{transform:scale(1.025);filter:saturate(.94
   .admin-identity-form{grid-template-columns:1fr}.admin-identity-form .admin-button{justify-self:start}.admin-identity-form .admin-message{grid-column:1}
   .admin-thumb-main{inset:5px;width:calc(100% - 10px)!important;height:calc(100% - 10px)!important}
 }
+
+
+/* ======================================================================
+   V7 — scroll glass header + denser editorial archive
+   ====================================================================== */
+:root{
+  --glass-bg:rgba(8,9,9,.54);
+  --glass-bg-deep:rgba(8,9,9,.70);
+  --glass-line:rgba(228,207,153,.20);
+  --glass-shadow:0 16px 55px rgba(0,0,0,.18);
+}
+
+/* Header: no boxed navigation while sitting over the hero. A soft top scrim
+   protects legibility; after scrolling, the whole bar becomes a restrained glass ribbon. */
+.site-header,
+body[data-page="home"] .site-header.home-header{
+  height:72px;
+  grid-template-columns:minmax(190px,1fr) auto minmax(190px,1fr);
+  align-items:center;
+  padding:0 clamp(18px,2vw,36px);
+  color:var(--home-gold);
+  mix-blend-mode:normal;
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  transition:height .38s cubic-bezier(.2,.8,.2,1),padding .38s cubic-bezier(.2,.8,.2,1),color .25s ease;
+  isolation:isolate;
+}
+.site-header::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  background:linear-gradient(180deg,rgba(3,4,4,.54) 0%,rgba(3,4,4,.18) 58%,rgba(3,4,4,0) 100%);
+  border-bottom:1px solid transparent;
+  backdrop-filter:blur(0px) saturate(100%);
+  -webkit-backdrop-filter:blur(0px) saturate(100%);
+  transition:background .42s ease,backdrop-filter .42s ease,border-color .42s ease,box-shadow .42s ease;
+}
+.site-header.is-scrolled::before{
+  background:var(--glass-bg);
+  border-color:var(--glass-line);
+  backdrop-filter:blur(18px) saturate(135%);
+  -webkit-backdrop-filter:blur(18px) saturate(135%);
+  box-shadow:var(--glass-shadow);
+}
+.site-header.is-deep-scrolled::before{background:var(--glass-bg-deep)}
+.site-header.is-scrolled{height:62px}
+.site-brand{position:relative;z-index:1;color:inherit}
+.site-brand small{color:var(--home-gold-muted);opacity:1}
+
+/* Strip the old framed-tab feeling out of the desktop nav. */
+.site-nav,
+body[data-page="home"] .home-nav{
+  justify-self:center;
+  display:flex;
+  align-items:center;
+  gap:clamp(20px,2.2vw,38px);
+  border:0;
+  background:transparent;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+.site-nav a,
+body[data-page="home"] .home-nav a{
+  position:relative;
+  padding:8px 0;
+  border:0;
+  color:inherit;
+  opacity:.78;
+  font:10px var(--mono);
+  letter-spacing:.07em;
+  transition:opacity .2s ease,color .2s ease;
+}
+.site-nav a::after,
+body[data-page="home"] .home-nav a::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:2px;
+  height:1px;
+  background:currentColor;
+  transform:scaleX(0);
+  transform-origin:center;
+  opacity:.75;
+  transition:transform .28s cubic-bezier(.2,.8,.2,1);
+}
+.site-nav a:hover,.site-nav a[aria-current="page"],
+body[data-page="home"] .home-nav a:hover{background:transparent;color:var(--home-gold);opacity:1;font-style:normal}
+.site-nav a:hover::after,.site-nav a[aria-current="page"]::after,
+body[data-page="home"] .home-nav a:hover::after{transform:scaleX(1)}
+.header-side,
+.home-header-tools{
+  justify-self:end;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  color:var(--home-gold-muted);
+  font:10px var(--mono);
+  letter-spacing:.06em;
+}
+.header-side a,.header-side button,.home-header-tools a,.home-header-tools button{color:inherit;opacity:.9;transition:color .2s,opacity .2s}
+.header-side a:hover,.header-side button:hover,.home-header-tools a:hover,.home-header-tools button:hover{color:var(--home-gold);opacity:1}
+.home-creative-toggle{justify-self:auto;font:inherit;letter-spacing:.06em;color:inherit}
+.home-creative-toggle::before{margin-right:6px}
+
+/* The archive now behaves like an editorial contact sheet rather than two hero images.
+   Natural image ratios are preserved: the rhythm comes from column density and occasional
+   in-column scale changes, not cropping. */
+.archive-grid{
+  column-count:4;
+  column-gap:clamp(14px,1.6vw,30px);
+  padding:54px clamp(18px,2.2vw,42px) 130px;
+}
+.archive-card{
+  break-inside:avoid;
+  display:inline-block;
+  width:100%;
+  margin:0 0 clamp(32px,4.2vw,72px);
+  vertical-align:top;
+}
+.archive-card:nth-child(9n+2),
+.archive-card:nth-child(9n+7){width:88%;margin-left:auto}
+.archive-card:nth-child(11n+4){width:92%}
+.archive-card:nth-child(10n+6){padding-top:clamp(24px,4.5vw,82px)}
+.archive-card img{
+  width:100%;
+  height:auto;
+  max-height:none;
+  object-fit:contain;
+  background:#0a0a0a;
+}
+.archive-card-meta{
+  margin-top:9px;
+  padding-top:7px;
+  font-size:12px;
+  letter-spacing:.01em;
+  gap:12px;
+}
+.archive-card-meta span:last-child{font-size:9px;white-space:nowrap}
+.archive-controls{
+  background:rgba(8,9,9,.46);
+  backdrop-filter:blur(14px) saturate(120%);
+  -webkit-backdrop-filter:blur(14px) saturate(120%);
+  border-color:rgba(228,207,153,.16);
+}
+
+@media(max-width:1450px){
+  .archive-grid{column-count:3}
+}
+@media(max-width:980px){
+  .site-header,body[data-page="home"] .site-header.home-header{height:58px;grid-template-columns:1fr auto;padding:0 16px}
+  .site-header::before{background:rgba(7,8,8,.28)}
+  .site-header.is-scrolled::before{background:rgba(7,8,8,.72);backdrop-filter:blur(18px) saturate(130%);-webkit-backdrop-filter:blur(18px) saturate(130%)}
+  .site-nav,body[data-page="home"] .home-nav,.header-side,.home-header-tools{display:none}
+  .archive-grid{column-count:2;column-gap:16px;padding:38px 18px 90px}
+  .archive-card,.archive-card:nth-child(n){width:100%;padding-top:0;margin-left:0;margin-bottom:42px}
+}
+@media(max-width:620px){
+  .archive-grid{column-count:1;padding:34px 16px 84px}
+  .archive-card{margin-bottom:58px}
+  .archive-card-meta{font-size:13px}
+  .archive-card-meta span:last-child{font-size:10px}
+}
+
+/* V8 — collection visibility controls */
+.admin-visibility-block{position:relative}
+.collection-visibility-head{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--paper-3);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
+.collection-visibility-list{display:grid}
+.collection-visibility-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:22px;padding:16px 0;border-bottom:1px solid var(--line);transition:opacity .2s ease,background .2s ease}
+.collection-visibility-row.is-hidden{opacity:.52}
+.collection-visibility-copy{display:flex;align-items:baseline;gap:14px;min-width:0}
+.collection-visibility-copy b{font:400 clamp(20px,2.1vw,30px)/1 var(--serif);letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.collection-visibility-copy span{font:9px var(--mono);color:var(--paper-3);letter-spacing:.06em;white-space:nowrap}
+.collection-visibility-switch{display:grid;grid-template-columns:auto auto;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.collection-visibility-switch input{position:absolute;opacity:0;pointer-events:none}
+.collection-switch-track{position:relative;width:48px;height:26px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.04);transition:background .22s ease,border-color .22s ease}
+.collection-switch-track i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--paper-3);transition:transform .22s cubic-bezier(.2,.8,.2,1),background .22s ease}
+.collection-visibility-switch input:checked + .collection-switch-track{background:rgba(228,207,153,.16);border-color:rgba(228,207,153,.55)}
+.collection-visibility-switch input:checked + .collection-switch-track i{transform:translateX(22px);background:var(--home-gold)}
+.collection-visibility-switch em{min-width:58px;text-align:right;font:9px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--paper-3)}
+.collection-visibility-switch input:checked ~ em{color:var(--home-gold)}
+.collection-visibility-switch input:disabled + .collection-switch-track{opacity:.45}
+#collection-visibility-status{margin:14px 0 0}
+
+@media(max-width:620px){
+  .collection-visibility-head{align-items:flex-start;flex-direction:column;gap:6px}
+  .collection-visibility-row{gap:12px;padding:15px 0}
+  .collection-visibility-copy{display:grid;gap:4px}
+  .collection-visibility-copy b{font-size:22px}
+  .collection-visibility-switch{gap:8px}
+  .collection-visibility-switch em{display:none}
+}

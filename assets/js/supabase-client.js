@@ -192,7 +192,7 @@
   const SETTINGS_PATH = 'site/site-settings.json';
   let settingsCache = null;
   async function loadSiteSettings(force = false) {
-    const fallback = { englishName: config.englishName || config.siteName || 'PHOTO ARCHIVE' };
+    const fallback = { englishName: config.englishName || config.siteName || 'PHOTO ARCHIVE', hiddenProjects: [] };
     if (!client) return fallback;
     if (settingsCache && !force) return { ...fallback, ...settingsCache };
     try {
@@ -205,12 +205,25 @@
       }
       const data = await response.json();
       settingsCache = data && typeof data === 'object' ? data : {};
+      if (!Array.isArray(settingsCache.hiddenProjects)) settingsCache.hiddenProjects = [];
+      settingsCache.hiddenProjects = [...new Set(settingsCache.hiddenProjects.map(v => String(v || '').trim()).filter(Boolean))];
       return { ...fallback, ...settingsCache };
     } catch (error) {
       console.warn('Site settings fallback:', error);
       return fallback;
     }
   }
+  function hiddenProjectSet(settings = {}) {
+    return new Set((Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : []).map(v => String(v || '').trim()).filter(Boolean));
+  }
+  function isProjectVisible(projectName, settings = {}) {
+    return !hiddenProjectSet(settings).has(String(projectName || '未分类').trim());
+  }
+  function filterVisiblePhotos(photos = [], settings = {}) {
+    const hidden = hiddenProjectSet(settings);
+    return photos.filter(photo => !hidden.has(String(photo.project || '未分类').trim()));
+  }
+
   async function saveSiteSettings(next = {}) {
     if (!client) throw new Error('Supabase 尚未连接');
     const { data:{ session } } = await client.auth.getSession();
@@ -229,6 +242,7 @@
   window.PhotoArchive = {
     config, configured, client, bucket: BUCKET, table: TABLE, escapeHtml, numberOrNull,
     cameraLabel, formatExposure, publicUrl, normalizePhoto, photoTime,
-    fetchPhotos, groupProjects, buildStats, loadSiteSettings, saveSiteSettings
+    fetchPhotos, groupProjects, buildStats, loadSiteSettings, saveSiteSettings,
+    hiddenProjectSet, isProjectVisible, filterVisiblePhotos
   };
 })();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Cinematic Photo Archive</title>
-  <link rel="stylesheet" href="assets/css/site.css?v=6">
+  <link rel="stylesheet" href="assets/css/site.css?v=8">
 </head>
 <body data-page="home" class="home-jason-layout">
   <div class="cinematic-loader" aria-hidden="true"><div class="loader-mark" data-english-name>XIAN YU SANG</div><div class="loader-time" data-loader-time></div></div>
@@ -15,15 +15,17 @@
 
   <header class="site-header home-header">
     <a class="site-brand" href="#top"><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a>
-    <button class="home-creative-toggle" type="button" data-creative-toggle>CREATIVE OFF</button>
-    <nav class="home-nav" aria-label="主导航">
+    <nav class="home-nav" aria-label="Primary navigation">
       <a href="#work">WORK</a>
       <a href="archive.html" data-transition>ARCHIVE</a>
       <a href="stats.html" data-transition>DATA</a>
       <a href="about.html" data-transition>ABOUT</a>
-      <a href="admin.html" data-transition>MANAGE</a>
     </nav>
-    <button class="mobile-menu-button" type="button" aria-label="菜单" aria-expanded="false" data-mobile-menu-button>≡</button>
+    <div class="home-header-tools">
+      <button class="home-creative-toggle" type="button" data-creative-toggle>CREATIVE OFF</button>
+      <a href="admin.html" data-transition>MANAGE</a>
+    </div>
+    <button class="mobile-menu-button" type="button" aria-label="Menu" aria-expanded="false" data-mobile-menu-button>≡</button>
   </header>
   <div class="mobile-menu" data-mobile-menu><nav><a href="#work">WORK</a><a href="archive.html">ARCHIVE</a><a href="stats.html">DATA</a><a href="about.html">ABOUT</a><a href="admin.html">MANAGE</a></nav></div>
 
@@ -49,6 +51,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=6"></script><script src="assets/js/site.js?v=6"></script><script src="assets/js/archive-data.js?v=6"></script>
+  <script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=8"></script><script src="assets/js/site.js?v=8"></script><script src="assets/js/archive-data.js?v=8"></script>
 </body>
 </html>

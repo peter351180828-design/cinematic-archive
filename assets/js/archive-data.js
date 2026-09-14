@@ -63,8 +63,9 @@
     const targets = $$('[data-global-count]');
     if (!targets.length) return;
     if (!A?.configured) return targets.forEach(el => el.textContent = 'NOT CONNECTED');
-    const photos = await photosSafe();
-    targets.forEach(el => el.textContent = photos ? `${photos.length} PHOTOS` : 'LOAD ERROR');
+    const [photos, settings] = await Promise.all([photosSafe(), A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})]);
+    const visible = photos ? (A?.filterVisiblePhotos ? A.filterVisiblePhotos(photos, settings) : photos) : null;
+    targets.forEach(el => el.textContent = visible ? `${visible.length} PHOTOS` : 'LOAD ERROR');
   }
 
   async function initHome() {
@@ -93,10 +94,16 @@
       slider.innerHTML = '<div class="home-loading">还没有照片。进入管理后台上传第一批照片。</div>';
       return;
     }
+    const publicPhotos = A?.filterVisiblePhotos ? A.filterVisiblePhotos(photos, siteSettings) : photos;
+    if (!publicPhotos.length) {
+      slider.innerHTML = '<div class="home-loading">目前没有公开展示的摄影集。你可以在管理后台重新设为 VISIBLE。</div>';
+      if (count) count.textContent = '00 个摄影集';
+      return;
+    }
 
-    const projects = A.groupProjects(photos);
+    const projects = A.groupProjects(publicPhotos);
     if (count) count.textContent = `${String(projects.length).padStart(2,'0')} 个摄影集`;
-    const heroPhoto = projects[0] ? (chooseHeroPhoto(photos, projects[0].name) || projects[0].cover) : null;
+    const heroPhoto = projects[0] ? (chooseHeroPhoto(publicPhotos, projects[0].name) || projects[0].cover) : null;
     if (heroBg && heroPhoto?.url) mountAdaptiveHero(heroBg, heroPhoto);
 
     slider.innerHTML = projects.map((project, i) => `
@@ -189,6 +196,12 @@
       return;
     }
     if (!A?.configured) { if (timeline) timeline.innerHTML = setupNotice(); return; }
+    const siteSettings = A?.loadSiteSettings ? await A.loadSiteSettings() : {};
+    if (A?.isProjectVisible && !A.isProjectVisible(collection, siteSettings)) {
+      if (timeline) timeline.innerHTML = '<div class="archive-empty">这个摄影集目前设为 HIDDEN，没有公开展示。</div>';
+      document.title = `Private Collection — ${A.config.siteName || '摄影档案'}`;
+      return;
+    }
     const photos = await photosSafe({project:collection,sort:'oldest'});
     if (!photos?.length) { if (timeline) timeline.innerHTML = '<div class="archive-empty">这个摄影集还没有照片。</div>'; return; }
     const years = photos.map(p=>new Date(p.exif?.dateTaken || p.uploadedAt)).filter(d=>!Number.isNaN(d.getTime())).map(d=>d.getFullYear());
@@ -203,7 +216,8 @@
     UI()?.activateReveals(timeline);
 
     const all = await photosSafe();
-    const projects = all ? A.groupProjects(all) : [];
+    const publicAll = all ? (A?.filterVisiblePhotos ? A.filterVisiblePhotos(all, siteSettings) : all) : [];
+    const projects = A.groupProjects(publicAll);
     const here = projects.findIndex(p=>p.name===collection);
     const next = projects.length > 1 ? projects[(here+1)%projects.length] : null;
     const link = $('#next-project');
@@ -225,13 +239,14 @@
     if (page !== 'archive') return;
     const grid = $('#archive-grid'), count = $('#archive-count'), filter = $('#archive-filter');
     if (!A?.configured) { grid.innerHTML = setupNotice(); return; }
-    const photos = await photosSafe();
+    const [photos, siteSettings] = await Promise.all([photosSafe(), A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})]);
     if (!photos) { grid.innerHTML = '<div class="archive-empty">读取失败，请检查网络。</div>'; return; }
-    const projects = [...new Set(photos.map(p=>p.project || '未分类'))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
+    const publicPhotos = A?.filterVisiblePhotos ? A.filterVisiblePhotos(photos, siteSettings) : photos;
+    const projects = [...new Set(publicPhotos.map(p=>p.project || '未分类'))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
     filter.insertAdjacentHTML('beforeend', projects.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join(''));
 
     const render = () => {
-      const visible = filter.value ? photos.filter(p=>(p.project||'未分类')===filter.value) : photos;
+      const visible = filter.value ? publicPhotos.filter(p=>(p.project||'未分类')===filter.value) : publicPhotos;
       count.textContent = `${visible.length} 张照片`;
       grid.innerHTML = visible.map(archiveCard).join('');
       UI()?.activateReveals(grid);
@@ -249,9 +264,10 @@
     if(page!=='stats') return;
     const root=$('#stats-root');
     if(!A?.configured){root.innerHTML=setupNotice();return;}
-    const photos=await photosSafe();
+    const [photos, siteSettings]=await Promise.all([photosSafe(), A?.loadSiteSettings ? A.loadSiteSettings() : Promise.resolve({})]);
     if(!photos){root.innerHTML='<div class="archive-empty">统计读取失败。</div>';return;}
-    const s=A.buildStats(photos);
+    const publicPhotos=A?.filterVisiblePhotos ? A.filterVisiblePhotos(photos,siteSettings) : photos;
+    const s=A.buildStats(publicPhotos);
     $('#stat-total').textContent=s.total;
     $('#stat-exif').textContent=`${s.exifCoverage}%`;
     $('#stat-camera').textContent=s.primaryCamera||'—';

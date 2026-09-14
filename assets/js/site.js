@@ -131,6 +131,27 @@
     addEventListener('resize', update); update();
   }
 
+  // V7 — transparent at the top, glass navigation after the page starts moving.
+  // Keeping the top state quiet prevents the header from looking like a box pasted onto the hero image.
+  const siteHeader = $('.site-header');
+  if (siteHeader) {
+    let ticking = false;
+    const syncHeader = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      siteHeader.classList.toggle('is-scrolled', y > 28);
+      siteHeader.classList.toggle('is-deep-scrolled', y > Math.max(220, innerHeight * .42));
+      ticking = false;
+    };
+    const requestHeaderSync = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(syncHeader);
+    };
+    addEventListener('scroll', requestHeaderSync, { passive:true });
+    addEventListener('resize', requestHeaderSync, { passive:true });
+    syncHeader();
+  }
+
   // Mark active nav by page.
   const page = document.body.dataset.page;
   $$('[data-nav-page]').forEach(a => {

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=6"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>管理 — 咸鱼桑</title><link rel="stylesheet" href="assets/css/site.css?v=8"></head>
 <body data-page="admin">
   <div class="film-grain"></div><div class="page-wipe"></div><div class="cursor-dot"></div><div class="cursor-ring"></div>
   <header class="site-header"><a class="site-brand" href="index.html" data-transition><span data-english-name>XIAN YU SANG</span><small>PHOTO ARCHIVE</small></a><nav class="site-nav"><a href="index.html" data-transition>WORK</a><a href="archive.html" data-transition>ARCHIVE</a><a href="stats.html" data-transition>DATA</a><a href="about.html" data-transition>ABOUT</a></nav><div class="header-side"><span id="auth-status">PRIVATE</span><button id="logout-button" type="button" hidden>LOG OUT</button></div><button class="mobile-menu-button" type="button" data-mobile-menu-button>≡</button></header>
@@ -21,6 +21,14 @@
           <button class="admin-button" type="submit">SAVE NAME</button>
           <p id="identity-status" class="admin-message">未保存修改</p>
         </form>
+      </section>
+
+
+      <section class="admin-section-block admin-visibility-block">
+        <div class="admin-section-title"><div><span class="eyebrow">COLLECTION VISIBILITY</span><h2>摄影集展示</h2></div><p>控制哪些摄影集出现在公开网站。设为 HIDDEN 只会从首页、档案、详情入口与数据页隐藏，不会删除照片或 EXIF。</p></div>
+        <div class="collection-visibility-head"><span id="collection-visibility-summary" class="mono">读取中</span><span>切换后立即保存</span></div>
+        <div id="collection-visibility-list" class="collection-visibility-list"><p class="admin-message">正在读取摄影集…</p></div>
+        <p id="collection-visibility-status" class="admin-message">所有摄影集默认 VISIBLE</p>
       </section>
 
       <section class="admin-section-block">
@@ -53,5 +61,5 @@
       </section>
     </section>
   </div></main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=6"></script><script src="assets/js/site.js?v=6"></script><script src="assets/js/admin.js?v=6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script><script src="assets/js/config.js?v=1"></script><script src="assets/js/supabase-client.js?v=8"></script><script src="assets/js/site.js?v=8"></script><script src="assets/js/admin.js?v=8"></script>
 </body></html>

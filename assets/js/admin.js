@@ -17,12 +17,14 @@
   const visibleCount = $('#admin-visible-count');
   const selectAllBtn = $('#admin-select-all'), clearBtn = $('#admin-clear-selection'), deleteBtn = $('#admin-delete-selected');
   const identityForm = $('#identity-form'), englishNameInput = $('#english-display-name'), identityStatus = $('#identity-status');
+  const visibilityList = $('#collection-visibility-list'), visibilityStatus = $('#collection-visibility-status'), visibilitySummary = $('#collection-visibility-summary');
 
   let files = [];
   let currentUser = null;
   let knownProjects = [];
   let libraryPhotos = [];
   let visiblePhotos = [];
+  let siteSettings = { hiddenProjects: [] };
   const selectedIds = new Set();
 
   function setStatus(message, isError=false) {
@@ -94,12 +96,64 @@
     if (!englishNameInput || !A?.loadSiteSettings) return;
     try {
       const settings = await A.loadSiteSettings(true);
+      siteSettings = { ...settings, hiddenProjects:Array.isArray(settings.hiddenProjects) ? settings.hiddenProjects : [] };
       englishNameInput.value = settings.englishName || A.config.englishName || '';
       if (identityStatus) identityStatus.textContent = '当前名称已同步';
+      renderCollectionVisibility();
     } catch (error) {
       if (identityStatus) identityStatus.textContent = `读取名称失败：${error.message || error}`;
     }
   }
+
+  function hiddenProjectsSet() {
+    return new Set((Array.isArray(siteSettings.hiddenProjects) ? siteSettings.hiddenProjects : []).map(v => String(v || '').trim()).filter(Boolean));
+  }
+
+  function renderCollectionVisibility() {
+    if (!visibilityList) return;
+    const hidden = hiddenProjectsSet();
+    const visibleProjects = knownProjects.filter(p => !hidden.has(p.name)).length;
+    if (visibilitySummary) visibilitySummary.textContent = `${visibleProjects} VISIBLE / ${knownProjects.length - visibleProjects} HIDDEN`;
+    if (!knownProjects.length) {
+      visibilityList.innerHTML = '<p class="admin-message">还没有摄影集。上传第一批照片后，这里会出现展示开关。</p>';
+      return;
+    }
+    visibilityList.innerHTML = knownProjects.map(project => {
+      const isVisible = !hidden.has(project.name);
+      return `<div class="collection-visibility-row ${isVisible ? '' : 'is-hidden'}">
+        <div class="collection-visibility-copy"><b>${escapeHtml(project.name)}</b><span>${project.count} PHOTOS</span></div>
+        <label class="collection-visibility-switch">
+          <input type="checkbox" data-collection-visibility data-project="${escapeHtml(project.name)}" ${isVisible ? 'checked' : ''}>
+          <span class="collection-switch-track"><i></i></span>
+          <em>${isVisible ? 'VISIBLE' : 'HIDDEN'}</em>
+        </label>
+      </div>`;
+    }).join('');
+  }
+
+  async function saveCollectionVisibility(projectName, shouldShow, input) {
+    if (!currentUser || !A?.saveSiteSettings) return;
+    const hidden = hiddenProjectsSet();
+    if (shouldShow) hidden.delete(projectName); else hidden.add(projectName);
+    if (visibilityStatus) visibilityStatus.textContent = `正在${shouldShow ? '显示' : '隐藏'}「${projectName}」…`;
+    if (input) input.disabled = true;
+    try {
+      siteSettings = await A.saveSiteSettings({ hiddenProjects:[...hidden] });
+      if (!Array.isArray(siteSettings.hiddenProjects)) siteSettings.hiddenProjects = [];
+      if (visibilityStatus) visibilityStatus.textContent = `已保存 · 「${projectName}」现在为 ${shouldShow ? 'VISIBLE' : 'HIDDEN'}`;
+      renderCollectionVisibility();
+    } catch (error) {
+      console.error(error);
+      if (visibilityStatus) visibilityStatus.textContent = `保存失败：${error.message || error}`;
+      if (input) { input.checked = !shouldShow; input.disabled = false; }
+    }
+  }
+
+  visibilityList?.addEventListener('change', e => {
+    const input = e.target.closest('[data-collection-visibility]');
+    if (!input) return;
+    saveCollectionVisibility(input.dataset.project || '', input.checked, input);
+  });
 
   identityForm?.addEventListener('submit', async e => {
     e.preventDefault();
@@ -127,7 +181,8 @@
     logoutBtn.hidden = !currentUser;
     if (currentUser) {
       $('#signed-in-email').textContent = currentUser.email || '已登录';
-      await Promise.all([loadIdentitySettings(), loadLibrary()]);
+      await loadIdentitySettings();
+      await loadLibrary();
     }
   }
 
@@ -267,6 +322,7 @@
       syncProjectChooser(preferredProject);
       syncLibraryChooser(preferredProject);
       $('#admin-photo-count').textContent = `${libraryPhotos.length} 张 · ${knownProjects.length} 个摄影集`;
+      renderCollectionVisibility();
       renderLibrary();
     } catch (error) { photoList.innerHTML = `<p class="admin-message">读取失败：${escapeHtml(error.message)}</p>`; }
   }
